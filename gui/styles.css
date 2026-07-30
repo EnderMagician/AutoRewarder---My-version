@@ -566,7 +566,39 @@ input[type="number"]:focus {
   box-shadow: none;
 }
 
-/* Run actions row: Start button (flex grow) + Stop button (fixed) */
+/* Secondary action used for the fixed multi-account batch control. */
+
+.secondary-btn-lg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background-color: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.secondary-btn-lg:hover:not(:disabled) {
+  background-color: var(--surface-3);
+  border-color: var(--accent);
+}
+
+.secondary-btn-lg:active:not(:disabled) { transform: translateY(1px); }
+
+.secondary-btn-lg:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+/* Run actions row: Start + batch buttons (flex grow), Stop (fixed). */
 
 .run-actions {
   display: flex;
@@ -575,7 +607,8 @@ input[type="number"]:focus {
   width: 100%;
 }
 
-.run-actions .primary-btn-lg {
+.run-actions .primary-btn-lg,
+.run-actions .secondary-btn-lg {
   flex: 1;
   width: auto;
 }

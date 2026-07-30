@@ -501,6 +501,23 @@ class AutoRewarderAPI:
             self.log(f"[WARNING] Failed to save search counts: {e}")
             return False
 
+    def get_batch_include_daily_tasks(self):
+        """Return the saved Daily tasks choice for a multi-account batch."""
+        return bool(
+            self.global_settings.get_settings().get("batch_include_daily_tasks", False)
+        )
+
+    def set_batch_include_daily_tasks(self, include_daily_tasks):
+        """Persist the Daily tasks choice used by the next account batch."""
+        try:
+            settings = self.global_settings.get_settings()
+            settings["batch_include_daily_tasks"] = bool(include_daily_tasks)
+            self.global_settings.save_settings(settings)
+            return True
+        except Exception as e:
+            self.log(f"[WARNING] Failed to save batch Daily tasks setting: {e}")
+            return False
+
     # ------------------------------------------------------------------
     # Exposed to JS: LLM-generated search terms + locale
     # ------------------------------------------------------------------
@@ -624,6 +641,7 @@ class AutoRewarderAPI:
     def run_all_accounts(self, include_daily_tasks=False):
         """Run every ready account sequentially, resuming completed accounts by date."""
         if not self._run_lock.acquire(blocking=False):
+            self._notify_batch_ui("idle")
             return {
                 "status": "busy",
                 "completed_account_ids": [],
@@ -702,6 +720,13 @@ class AutoRewarderAPI:
 
                 stopped = bool(outcome.get("stopped") or self._stop_event.is_set())
                 status = "stopped" if stopped else "failed"
+                if stopped:
+                    self.log(f"Batch stopped at '{account['label']}'.")
+                else:
+                    self.log(
+                        f"[ERROR] Batch failed at '{account['label']}': "
+                        f"{outcome.get('error') or 'unknown error'}"
+                    )
                 return {
                     "status": status,
                     "completed_account_ids": completed,

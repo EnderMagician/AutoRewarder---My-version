@@ -70,6 +70,12 @@
           <span class="toggle-label">Daily tasks only</span>
         </label>
 
+        <label class="toggle-row" title="Only applies to Run all accounts; searches always use each account's saved schedule">
+          <input type="checkbox" id="batchDailyTasksToggle">
+          <span class="toggle-pill"></span>
+          <span class="toggle-label">Include Daily tasks</span>
+        </label>
+
         <div class="field-inline queries-panel">
           <span class="field-label">Queries</span>
           <div class="count-group">
@@ -97,6 +103,12 @@
             <polygon points="6 4 20 12 6 20 6 4"></polygon>
           </svg>
           <span class="btn-label">Start run</span>
+        </button>
+        <button id="batch_run_btn" class="secondary-btn-lg" type="button" onclick="start_all_accounts()" disabled>
+          <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 2v10h10V7H7zm1.5 2.5h7v1.5h-7V9.5zm0 3.5h7v1.5h-7v-1.5z"></path>
+          </svg>
+          <span class="batch-btn-label">Run all accounts</span>
         </button>
         <button id="stop_btn" class="stop-btn" type="button" onclick="stop_bot()" disabled aria-label="Stop the current run">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

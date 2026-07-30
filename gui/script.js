@@ -11,6 +11,10 @@ let driverWarmingUp = false;
 // True while a balance scrape holds a driver (launch refresh, manual refresh,
 // or account-switch refresh). Start must stay disabled during it too.
 let balanceFetching = false;
+// True while the fixed multi-account runner owns the backend lock. This is
+// intentionally separate from a normal Start run so the batch-only controls
+// can be restored to the account that was selected before the batch began.
+let batchRunning = false;
 
 // =========================================================================
 // Toasts
@@ -232,6 +236,10 @@ function update_log_once(message) {
 // =========================================================================
 
 function start_bot() {
+  if (batchRunning) {
+    show_toast('A multi-account run is already in progress.', 'warning');
+    return;
+  }
   if (!currentAccountId) {
     show_toast('Add an account first.', 'warning');
     return;
@@ -288,6 +296,109 @@ function start_bot() {
   pywebview.api.main(pc, mobile, dailyOnly);
 }
 
+function _has_ready_account() {
+  return accountsCache.some(account => account.first_setup_done);
+}
+
+function set_batch_controls(running) {
+  batchRunning = Boolean(running);
+  const current = accountsCache.find(account => account.id === currentAccountId);
+  const busy = driverWarmingUp || balanceFetching;
+
+  if (batchRunning) {
+    toggle_account_menu(false);
+    close_accounts_modal();
+    close_settings_modal();
+  }
+
+  const startBtn = document.getElementById('start_btn');
+  if (startBtn) {
+    startBtn.disabled = batchRunning || !(current && current.first_setup_done) || busy;
+  }
+
+  const batchBtn = document.getElementById('batch_run_btn');
+  if (batchBtn) {
+    batchBtn.disabled = batchRunning || !_has_ready_account() || busy;
+    const label = batchBtn.querySelector('.batch-btn-label');
+    if (!batchRunning && label) label.textContent = 'Run all accounts';
+  }
+
+  const batchToggle = document.getElementById('batchDailyTasksToggle');
+  if (batchToggle) batchToggle.disabled = batchRunning;
+
+  const trigger = document.getElementById('account_trigger');
+  if (trigger) trigger.disabled = batchRunning || !current;
+  const manageBtn = document.getElementById('manageBtn');
+  if (manageBtn) manageBtn.disabled = batchRunning;
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) settingsBtn.disabled = batchRunning;
+
+  const stopBtn = document.getElementById('stop_btn');
+  if (stopBtn) {
+    stopBtn.disabled = !batchRunning;
+    const stopLabel = stopBtn.querySelector('.stop-label');
+    if (!batchRunning && stopLabel) stopLabel.textContent = 'Stop';
+  }
+}
+
+function update_batch_run_ui(state, account, completed, total) {
+  const running = state === 'running';
+  set_batch_controls(running);
+
+  const batchBtn = document.getElementById('batch_run_btn');
+  const label = batchBtn && batchBtn.querySelector('.batch-btn-label');
+  if (running && label) {
+    label.textContent = account && total
+      ? `Running ${Math.min(Number(completed || 0) + 1, Number(total))}/${total}`
+      : 'Running…';
+  }
+
+  update_status_indicator(running ? 'executing' : undefined);
+  if (!running) refresh_account_ui();
+}
+
+async function start_all_accounts() {
+  if (batchRunning) return;
+  if (!_has_ready_account()) {
+    show_toast('Finish First Setup for at least one account first.', 'warning');
+    return;
+  }
+
+  const toggle = document.getElementById('batchDailyTasksToggle');
+  const includeDailyTasks = Boolean(toggle && toggle.checked);
+  set_batch_controls(true);
+  update_status_indicator('executing');
+
+  try {
+    await pywebview.api.set_batch_include_daily_tasks(includeDailyTasks);
+    const result = await pywebview.api.run_all_accounts(includeDailyTasks);
+    if (!result) return;
+
+    const count = (result.completed_account_ids || []).length;
+    const skipped = (result.skipped_account_ids || []).length;
+    if (result.status === 'completed') {
+      show_toast(
+        `Batch completed: ${count} account${count === 1 ? '' : 's'} run, ${skipped} skipped.`,
+        'success'
+      );
+    } else if (result.status === 'stopped') {
+      show_toast('Batch stopped. Completed accounts will be skipped on retry.', 'warning');
+    } else if (result.status === 'busy') {
+      show_toast('Another AutoRewarder run is active. Try again after it finishes.', 'warning');
+    } else {
+      show_toast(
+        `Batch stopped at an account: ${result.error || 'unknown error'}.`,
+        'error'
+      );
+    }
+  } catch (err) {
+    console.error('run_all_accounts failed:', err);
+    show_toast('Could not start the multi-account run.', 'error');
+    set_batch_controls(false);
+    update_status_indicator();
+  }
+}
+
 function _sync_daily_only_ui() {
   const toggle = document.getElementById('dailyOnlyToggle');
   const pcField = document.getElementById('count_pc');
@@ -321,9 +432,21 @@ document.addEventListener('DOMContentLoaded', function () {
   };
   if (pcField) pcField.addEventListener('blur', save_counts);
   if (mobileField) mobileField.addEventListener('blur', save_counts);
+
+  const batchToggle = document.getElementById('batchDailyTasksToggle');
+  if (batchToggle) {
+    batchToggle.addEventListener('change', () => {
+      pywebview.api.set_batch_include_daily_tasks(Boolean(batchToggle.checked))
+        .catch(err => console.error('Failed to save batch Daily tasks setting:', err));
+    });
+  }
 });
 
 function enable_start_button() {
+  if (batchRunning) {
+    set_batch_controls(true);
+    return;
+  }
   const btn = document.getElementById('start_btn');
   const label = btn.querySelector('.btn-label');
   if (label) label.textContent = 'Start run';
@@ -360,10 +483,13 @@ function update_status_indicator(forceState) {
 
   let state = forceState;
   if (!state) {
+    if (batchRunning) state = 'executing';
     const current = accountsCache.find(a => a.id === currentAccountId);
-    if (!current) state = 'empty';
-    else if (!current.first_setup_done) state = 'setup';
-    else state = 'ready';
+    if (!state) {
+      if (!current) state = 'empty';
+      else if (!current.first_setup_done) state = 'setup';
+      else state = 'ready';
+    }
   }
 
   set_hide_browser_toggle_enabled(state !== 'executing');
@@ -541,8 +667,10 @@ function render_account_menu() {
       check.setAttribute('stroke-linejoin', 'round');
       check.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
       btn.appendChild(check);
+      btn.disabled = batchRunning;
 
       btn.addEventListener('click', () => {
+        if (batchRunning) return;
         toggle_account_menu(false);
         if (acc.id !== currentAccountId) {
           pywebview.api.switch_account(acc.id).then(ok => {
@@ -565,10 +693,12 @@ function render_account_menu() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'menu-action';
+  addBtn.disabled = batchRunning;
   addBtn.innerHTML =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
     '<span>Add account</span>';
   addBtn.addEventListener('click', () => {
+    if (batchRunning) return;
     toggle_account_menu(false);
     prompt_and_create_account();
   });
@@ -578,11 +708,13 @@ function render_account_menu() {
     const manageBtn = document.createElement('button');
     manageBtn.type = 'button';
     manageBtn.className = 'menu-action';
+    manageBtn.disabled = batchRunning;
     manageBtn.style.color = 'var(--text-muted)';
     manageBtn.innerHTML =
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
       '<span>Manage accounts…</span>';
     manageBtn.addEventListener('click', () => {
+      if (batchRunning) return;
       toggle_account_menu(false);
       open_accounts_modal();
     });
@@ -604,13 +736,13 @@ function render_account_trigger() {
     avatarEl.style.backgroundColor = avatar_color(current.id);
     labelEl.textContent = current.label;
     metaEl.textContent = current.first_setup_done ? 'Ready to run' : 'Setup pending';
-    trigger.disabled = false;
+    trigger.disabled = batchRunning;
   } else {
     avatarEl.textContent = '+';
     avatarEl.style.backgroundColor = 'var(--surface-3)';
     labelEl.textContent = 'No account yet';
     metaEl.textContent = accountsCache.length ? 'Select one below' : 'Add your first account';
-    trigger.disabled = accountsCache.length === 0 && false; // keep clickable to open menu
+    trigger.disabled = batchRunning; // keep empty-state picker clickable otherwise
   }
 }
 
@@ -619,6 +751,10 @@ function render_account_trigger() {
 // =========================================================================
 
 async function prompt_and_create_account() {
+  if (batchRunning) {
+    show_toast('Account changes are disabled while the batch is running.', 'warning');
+    return;
+  }
   const defaultLabel = `Account ${accountsCache.length + 1}`;
   const label = await prompt_modal(
     'Add a new account',
@@ -652,6 +788,10 @@ async function prompt_and_create_account() {
 // =========================================================================
 
 function open_accounts_modal() {
+  if (batchRunning) {
+    show_toast('Account changes are disabled while the batch is running.', 'warning');
+    return;
+  }
   const backdrop = document.getElementById('accounts_modal');
   if (!backdrop) return;
   backdrop.hidden = false;
@@ -670,6 +810,10 @@ function close_accounts_modal() {
 // =========================================================================
 
 function open_settings_modal() {
+  if (batchRunning) {
+    show_toast('Settings are disabled while the batch is running.', 'warning');
+    return;
+  }
   const backdrop = document.getElementById('settings_modal');
   if (!backdrop) return;
 
@@ -1145,9 +1289,14 @@ function refresh_account_ui() {
     const busy = driverWarmingUp || balanceFetching;
     const shouldEnable = Boolean(current && current.first_setup_done) && !busy;
     const label = startBtn.querySelector('.btn-label');
-    if (!label || label.textContent === 'Start run' || label.textContent === 'Loading…') {
+    if (!batchRunning && (!label || label.textContent === 'Start run' || label.textContent === 'Loading…')) {
       startBtn.disabled = !shouldEnable;
       if (label) label.textContent = busy ? 'Loading…' : 'Start run';
+    }
+
+    const batchBtn = document.getElementById('batch_run_btn');
+    if (batchBtn && !batchRunning) {
+      batchBtn.disabled = !_has_ready_account() || busy;
     }
 
     update_status_indicator();
@@ -1338,6 +1487,10 @@ window.addEventListener('pywebviewready', function() {
   pywebview.api.get_settings().then(function(settings) {
     const toggle = document.getElementById('hideBrowserToggle');
     if (toggle) toggle.checked = Boolean(settings.hide_browser);
+    const batchToggle = document.getElementById('batchDailyTasksToggle');
+    if (batchToggle) {
+      batchToggle.checked = Boolean(settings.batch_include_daily_tasks);
+    }
   });
 
   // Load saved query counts from global settings.

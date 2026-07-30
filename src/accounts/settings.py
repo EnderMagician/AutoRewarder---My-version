@@ -100,6 +100,9 @@ class GlobalSettingsManager:
             # Default query counts.
             "queries_pc": 30,
             "queries_mobile": 20,
+            # Whether the GUI's multi-account batch includes Daily Set /
+            # claim / earn tasks. This only affects "Run all accounts".
+            "batch_include_daily_tasks": False,
             # LLM-generated search terms (bring-your-own-key). When enabled and
             # a key is present, each phase asks the chosen provider for fresh
             # queries in the user's language; any failure falls back to the

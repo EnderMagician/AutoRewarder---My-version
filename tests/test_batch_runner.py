@@ -28,6 +28,26 @@ class _Coordinator:
         return None
 
 
+class _ScheduledRunCoordinator(_Coordinator):
+    def __init__(self):
+        super().__init__()
+        self.stop_requested = False
+        self.waited_for_release = False
+
+    def active_run(self):
+        if self.waited_for_release:
+            return None
+        return {"origin": "scheduled"}
+
+    def request_stop_for_scheduled(self):
+        self.stop_requested = True
+        return True
+
+    def wait_for_release(self, timeout):
+        self.waited_for_release = timeout == 60
+        return True
+
+
 class _Accounts:
     def __init__(self):
         self.current = "original"
@@ -48,6 +68,17 @@ class _Accounts:
     def select(self, account_id):
         self.current = account_id
         self.selected.append(account_id)
+
+
+class _GlobalSettings:
+    def __init__(self):
+        self.data = {}
+
+    def get_settings(self):
+        return dict(self.data)
+
+    def save_settings(self, settings):
+        self.data = dict(settings)
 
 
 class BatchRunnerTests(unittest.TestCase):
@@ -119,6 +150,23 @@ class BatchRunnerTests(unittest.TestCase):
             [("ready-a", 11, 4, False), ("ready-b", 7, 2, False)], api.calls
         )
         self.assertEqual("original", api.account_manager.current_id())
+
+    def test_batch_requests_an_existing_scheduled_run_to_stop_before_acquiring_lock(self):
+        api = self._api(
+            {
+                "ready-a": {"completed": True, "stopped": False, "error": None},
+                "ready-b": {"completed": True, "stopped": False, "error": None},
+            }
+        )
+        coordinator = _ScheduledRunCoordinator()
+        api.run_coordinator = coordinator
+
+        result = api.run_all_accounts()
+
+        self.assertEqual("completed", result["status"])
+        self.assertTrue(coordinator.stop_requested)
+        self.assertTrue(coordinator.waited_for_release)
+        self.assertEqual(["batch"], coordinator.origins)
 
 
 class SingleAccountRunTests(unittest.TestCase):
@@ -240,6 +288,14 @@ class SingleAccountRunTests(unittest.TestCase):
         self.assertTrue(result["completed"])
         self.assertEqual(["scheduled"], api.run_coordinator.origins)
         self.assertTrue(api.run_coordinator.lease.released)
+
+    def test_batch_daily_tasks_choice_is_persisted_for_the_gui(self):
+        api = self._api()
+        api.global_settings = _GlobalSettings()
+
+        self.assertFalse(api.get_batch_include_daily_tasks())
+        self.assertTrue(api.set_batch_include_daily_tasks(True))
+        self.assertTrue(api.get_batch_include_daily_tasks())
 
 
 if __name__ == "__main__":
