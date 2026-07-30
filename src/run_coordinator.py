@@ -17,7 +17,6 @@ from typing import Callable, Optional
 
 from .config import APP_DIR
 
-
 RUN_ORIGIN_BATCH = "batch"
 RUN_ORIGIN_SCHEDULED = "scheduled"
 RUN_ORIGIN_INTERACTIVE = "interactive"
@@ -145,7 +144,12 @@ class RunCoordinator:
         session_id = record.get("session_id")
         origin = record.get("origin")
         pid = record.get("pid")
-        if not isinstance(session_id, str) or origin not in _VALID_ORIGINS:
+        if (
+            not isinstance(session_id, str)
+            or origin not in _VALID_ORIGINS
+            or not isinstance(pid, int)
+            or isinstance(pid, bool)
+        ):
             return True
         return not self._pid_alive(pid)
 
