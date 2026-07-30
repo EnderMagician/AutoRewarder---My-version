@@ -129,6 +129,33 @@ class BatchRunnerTests(unittest.TestCase):
         self.assertEqual(["ready-a", "ready-b"], api.marked)
         self.assertEqual("original", api.account_manager.current_id())
 
+    def test_batch_progress_excludes_completed_today_accounts_from_remaining_total(self):
+        """Catch a UI counter that includes accounts skipped for today's marker."""
+        api = self._api(
+            {
+                "ready-a": {"completed": True, "stopped": False, "error": None},
+                "ready-b": {"completed": True, "stopped": False, "error": None},
+            }
+        )
+        notifications = []
+
+        def notify(state, account=None, completed=0, total=0, skipped=0):
+            if state == "running":
+                notifications.append((account, completed, total, skipped))
+
+        api._notify_batch_ui = notify
+
+        api.run_all_accounts()
+
+        self.assertEqual(
+            [
+                (None, 0, 2, 1),
+                ("Ready A", 0, 2, 1),
+                ("Ready B", 1, 2, 1),
+            ],
+            notifications,
+        )
+
     def test_batch_stops_on_first_unfinished_account_and_resumes_completed_marker(self):
         api = self._api(
             {

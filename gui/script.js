@@ -326,6 +326,14 @@ function set_batch_controls(running) {
   const batchToggle = document.getElementById('batchDailyTasksToggle');
   if (batchToggle) batchToggle.disabled = batchRunning;
 
+  const dailyOnlyToggle = document.getElementById('dailyOnlyToggle');
+  if (dailyOnlyToggle) dailyOnlyToggle.disabled = batchRunning;
+  const pcField = document.getElementById('count_pc');
+  const mobileField = document.getElementById('count_mobile');
+  const dailyOnly = Boolean(dailyOnlyToggle && dailyOnlyToggle.checked);
+  if (pcField) pcField.disabled = batchRunning || dailyOnly;
+  if (mobileField) mobileField.disabled = batchRunning || dailyOnly;
+
   const trigger = document.getElementById('account_trigger');
   if (trigger) trigger.disabled = batchRunning || !current;
   const manageBtn = document.getElementById('manageBtn');
@@ -341,16 +349,30 @@ function set_batch_controls(running) {
   }
 }
 
-function update_batch_run_ui(state, account, completed, total) {
+function update_batch_run_ui(state, account, completed, total, skipped) {
   const running = state === 'running';
   set_batch_controls(running);
 
   const batchBtn = document.getElementById('batch_run_btn');
   const label = batchBtn && batchBtn.querySelector('.batch-btn-label');
-  if (running && label) {
-    label.textContent = account && total
-      ? `Running ${Math.min(Number(completed || 0) + 1, Number(total))}/${total}`
-      : 'Running…';
+  if (label) label.textContent = 'Run all accounts';
+
+  const progress = document.getElementById('batch_progress');
+  const progressText = document.getElementById('batch_progress_text');
+  const accountName = document.getElementById('batch_account_name');
+  const runnableTotal = Number(total || 0);
+  const skippedCount = Number(skipped || 0);
+  if (running && account && runnableTotal > 0) {
+    const current = Math.min(Number(completed || 0) + 1, runnableTotal);
+    if (progress) progress.hidden = false;
+    if (progressText) {
+      progressText.textContent =
+        `${current} of ${runnableTotal} remaining · ${skippedCount} skipped today`;
+    }
+    if (accountName) accountName.textContent = `Running ${account}`;
+  } else if (!running) {
+    if (progress) progress.hidden = true;
+    if (accountName) accountName.textContent = 'Ready to start';
   }
 
   update_status_indicator(running ? 'executing' : undefined);
@@ -404,9 +426,9 @@ function _sync_daily_only_ui() {
   const pcField = document.getElementById('count_pc');
   const mobileField = document.getElementById('count_mobile');
   if (!toggle) return;
-  const off = toggle.checked;
-  if (pcField) pcField.disabled = off;
-  if (mobileField) mobileField.disabled = off;
+  const searchesDisabled = toggle.checked || batchRunning;
+  if (pcField) pcField.disabled = searchesDisabled;
+  if (mobileField) mobileField.disabled = searchesDisabled;
 }
 
 document.addEventListener('DOMContentLoaded', function () {

@@ -326,3 +326,131 @@ body {
   text-align: center;
   padding: 16px;
 }
+
+/* Material 3 compact treatment */
+body { padding: 18px; background: var(--md-bg); }
+
+.dash {
+  gap: 14px;
+  max-width: 720px;
+  padding-bottom: 18px;
+}
+
+.dash-title {
+  color: var(--md-text);
+  font-size: 17px;
+  font-weight: 720;
+}
+
+.dash-title svg { color: var(--md-primary); }
+
+.account-pill {
+  border-color: var(--md-outline);
+  border-radius: 10px;
+  color: var(--md-muted);
+  background: var(--md-surface);
+}
+
+.dash-hero { gap: 10px; }
+
+.hero-card,
+.metric,
+.runs-chart,
+.dash-table {
+  border-color: var(--md-outline);
+  background: var(--md-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.hero-card { padding: 14px 16px; border-radius: var(--md-radius); }
+.hero-primary { border-color: rgba(134, 150, 255, 0.68); background: linear-gradient(135deg, rgba(92, 113, 245, 0.2), var(--md-surface)); }
+.hero-value { color: var(--md-primary); font-size: 28px; }
+.hero-label { color: var(--md-muted); }
+.hero-sub { color: var(--md-dim); }
+
+.refresh-btn {
+  border-color: var(--md-outline-strong);
+  border-radius: 9px;
+  color: var(--md-text);
+  background: rgba(117, 136, 255, 0.1);
+}
+.refresh-btn:hover:not(:disabled) { border-color: var(--md-primary); background: rgba(117, 136, 255, 0.18); }
+.refresh-btn svg { color: var(--md-primary); }
+
+.dash-section { gap: 9px; }
+.dash-section-title { color: var(--md-muted); font-size: 10px; }
+.metric-grid { gap: 8px; }
+.metric { padding: 11px 12px; border-radius: var(--md-radius-sm); }
+.metric-value { color: var(--md-text); font-size: 18px; }
+.metric-label { color: var(--md-muted); font-size: 10px; }
+
+.runs-chart { height: 164px; padding: 10px; border-radius: var(--md-radius); }
+.dash-table { border-radius: var(--md-radius); }
+.dash-table th,
+.dash-table td { padding: 9px 11px; border-bottom-color: rgba(61, 71, 96, 0.52); }
+.dash-table thead th { color: var(--md-muted); background: #1a2030; font-size: 10px; }
+.dash-table tbody tr:hover { background: rgba(117, 136, 255, 0.08); }
+.dash-empty, .dash-empty-row { color: var(--md-muted); }
+
+/* Refined dashboard hierarchy: data stays the same, with a quieter shell. */
+.dash-header {
+  min-height: 46px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid rgba(61, 71, 96, 0.54);
+}
+
+.dash-hero {
+  position: relative;
+  padding: 1px;
+  border-radius: calc(var(--md-radius) + 1px);
+  background: linear-gradient(120deg, rgba(136, 151, 255, 0.52), rgba(53, 63, 91, 0.35));
+}
+
+.hero-card { border: 0; }
+.hero-primary {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(150, 168, 255, 0.24), transparent 38%),
+    linear-gradient(135deg, #293769, #1c264b);
+}
+
+.hero-value { letter-spacing: -0.65px; }
+.hero-primary .hero-value { color: #d8ddff; }
+.hero-card:not(.hero-primary) .hero-value { color: #90df7a; }
+
+.dash-section-title {
+  padding-left: 9px;
+  border-left: 3px solid var(--md-primary-strong);
+  color: #b8c1dd;
+}
+
+.metric {
+  position: relative;
+  overflow: hidden;
+  transition: transform 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+
+.metric::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  bottom: -24px;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(139, 155, 255, 0.12);
+  border-radius: 50%;
+}
+
+.metric:hover {
+  border-color: rgba(132, 150, 255, 0.68);
+  background: var(--md-surface-hover);
+  transform: translateY(-1px);
+}
+
+.runs-chart {
+  background:
+    repeating-linear-gradient(0deg, transparent 0, transparent 32px, rgba(122, 137, 177, 0.07) 33px),
+    var(--md-surface);
+}
+
+.dash-table tbody tr { transition: background-color 140ms ease; }
+.dash-table tbody tr:hover { background: rgba(117, 136, 255, 0.1); }

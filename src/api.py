@@ -620,14 +620,15 @@ class AutoRewarderAPI:
         schedule["last_triggered_date"] = date.today().isoformat()
         meta.set_schedule(schedule)
 
-    def _notify_batch_ui(self, state, account=None, completed=0, total=0):
+    def _notify_batch_ui(self, state, account=None, completed=0, total=0, skipped=0):
         """Update batch-specific GUI state when a webview is attached."""
         if not self._webview_window:
             return
         try:
             self._webview_window.evaluate_js(
                 "typeof update_batch_run_ui === 'function' && update_batch_run_ui("
-                f"{json.dumps(state)}, {json.dumps(account)}, {int(completed)}, {int(total)})"
+                f"{json.dumps(state)}, {json.dumps(account)}, {int(completed)}, "
+                f"{int(total)}, {int(skipped)})"
             )
         except Exception:
             pass
@@ -689,22 +690,36 @@ class AutoRewarderAPI:
                 }
 
             self._stop_event.clear()
-            accounts = self.account_manager.list()
-            total = sum(1 for account in accounts if account.get("first_setup_done"))
-            self._notify_batch_ui("running", completed=0, total=total)
-
-            for account in accounts:
-                account_id = account.get("id")
-                if not account_id or not account.get("first_setup_done"):
-                    continue
+            ready_accounts = [
+                account
+                for account in self.account_manager.list()
+                if account.get("id") and account.get("first_setup_done")
+            ]
+            runnable_accounts = []
+            for account in ready_accounts:
+                account_id = account["id"]
                 if self._is_account_completed_today(account_id):
                     skipped.append(account_id)
                     self.log(f"Skipping '{account['label']}': completed today.")
-                    continue
+                else:
+                    runnable_accounts.append(account)
+
+            total = len(runnable_accounts)
+            skipped_count = len(skipped)
+            self._notify_batch_ui(
+                "running", completed=0, total=total, skipped=skipped_count
+            )
+
+            for account in runnable_accounts:
+                account_id = account["id"]
 
                 self._select_account_for_batch(account_id)
                 self._notify_batch_ui(
-                    "running", account["label"], completed=len(completed), total=total
+                    "running",
+                    account["label"],
+                    completed=len(completed),
+                    total=total,
+                    skipped=skipped_count,
                 )
                 schedule = self._get_account_schedule(account_id)
                 outcome = self._run_current_account(
