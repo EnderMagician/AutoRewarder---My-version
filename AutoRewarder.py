@@ -50,7 +50,7 @@ if __name__ == "__main__":
         title="AutoRewarder",
         url=os.path.join(GUI_DIR, "index.html"),
         js_api=api,
-        width=680,
+        width=640,
         height=840,
         resizable=False,
         background_color="#0b0d12",

@@ -2383,3 +2383,482 @@ select {
 .log-line.warning { color: rgba(255, 202, 91, 0.78); }
 .log-line.success { color: rgba(135, 220, 107, 0.8); }
 .activity-feed a { color: rgba(166, 180, 255, 0.88); }
+
+/* Activity log: a roomy, structured timeline that mirrors the desktop M3
+   reference while keeping every backend message selectable and visible. */
+.activity-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.activity-card .card-header {
+  min-height: 34px;
+  padding: 0 5px 7px;
+}
+
+.activity-card .card-label {
+  color: #eff1fb;
+  font-size: 15px;
+  font-weight: 680;
+  letter-spacing: -0.18px;
+}
+
+.ghost-link {
+  color: #aab6ff;
+  font-size: 11px;
+}
+
+.activity-feed {
+  min-height: 190px;
+  max-height: 222px;
+  padding: 0 11px;
+  overflow: auto;
+  border: 1px solid rgba(66, 78, 108, 0.82);
+  border-radius: 16px;
+  background:
+    linear-gradient(115deg, rgba(23, 28, 40, 0.98), rgba(13, 17, 25, 0.98));
+  box-shadow: inset 0 1px 0 rgba(236, 240, 255, 0.025);
+  color: rgba(221, 226, 242, 0.82);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  user-select: text;
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 75px 15px minmax(0, 1fr);
+  align-items: center;
+  min-height: 31px;
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(64, 75, 102, 0.38);
+  color: rgba(222, 227, 242, 0.82);
+  animation: log-in 180ms ease-out;
+}
+
+.log-line:last-child { border-bottom: 0; }
+
+.log-time {
+  color: rgba(157, 169, 198, 0.68);
+  font-variant-numeric: tabular-nums;
+}
+
+.log-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(155, 169, 202, 0.62);
+  box-shadow: 0 0 0 3px rgba(144, 157, 187, 0.06);
+}
+
+.log-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.log-line.success .log-status-dot {
+  background: rgba(135, 220, 107, 0.9);
+  box-shadow: 0 0 0 3px rgba(135, 220, 107, 0.08);
+}
+
+.log-line.warning .log-status-dot {
+  background: rgba(255, 202, 91, 0.92);
+  box-shadow: 0 0 0 3px rgba(255, 202, 91, 0.08);
+}
+
+.log-line.error .log-status-dot {
+  background: rgba(255, 126, 126, 0.9);
+  box-shadow: 0 0 0 3px rgba(255, 126, 126, 0.08);
+}
+
+.log-line.success .log-message { color: rgba(194, 236, 181, 0.84); }
+.log-line.warning .log-message { color: rgba(243, 220, 167, 0.84); }
+.log-line.error .log-message { color: rgba(246, 183, 183, 0.84); }
+
+.activity-feed a {
+  color: #afbbff;
+  font-family: Inter, "Segoe UI", sans-serif;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.activity-feed a:hover { color: #d5dcff; text-decoration: underline; }
+
+.status-row {
+  min-height: 25px;
+  padding: 0 5px;
+  color: rgba(166, 178, 207, 0.86);
+  font-size: 10.5px;
+}
+
+/* Dashboard cards follow the visual hierarchy of the approved reference,
+   while the values remain the real metrics provided by this application. */
+.stats-card {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.stats-card::before { display: none; }
+
+.stats-card:hover,
+.stats-card:focus-visible {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+  outline: none;
+}
+
+.stats-card:focus-visible .metric-card {
+  border-color: rgba(159, 174, 255, 0.86);
+  box-shadow: 0 0 0 2px rgba(135, 151, 255, 0.23);
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 118px;
+  padding: 14px 15px;
+  overflow: hidden;
+  border: 1px solid rgba(61, 73, 101, 0.92);
+  border-radius: 17px;
+  background: linear-gradient(126deg, rgba(27, 33, 46, 0.98), rgba(15, 19, 28, 0.98));
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(112, 130, 181, 0.94);
+  box-shadow: 0 11px 24px rgba(0, 0, 0, 0.2);
+}
+
+.metric-total {
+  background:
+    radial-gradient(circle at 10% 88%, rgba(99, 187, 79, 0.18), transparent 47%),
+    linear-gradient(126deg, rgba(25, 37, 31, 0.99), rgba(15, 20, 27, 0.99));
+}
+
+.metric-session {
+  background:
+    radial-gradient(circle at 13% 8%, rgba(105, 123, 255, 0.2), transparent 42%),
+    linear-gradient(126deg, rgba(28, 31, 56, 0.99), rgba(16, 20, 31, 0.99));
+}
+
+.metric-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  place-items: center;
+  margin-right: 13px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.metric-total .metric-icon {
+  color: #91df76;
+  background: rgba(66, 136, 58, 0.16);
+  box-shadow: inset 0 0 0 5px rgba(118, 211, 91, 0.05);
+}
+
+.metric-session .metric-icon {
+  color: #9ca9ff;
+  background: rgba(85, 102, 214, 0.16);
+  box-shadow: inset 0 0 0 5px rgba(134, 149, 255, 0.05);
+}
+
+.metric-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.metric-label {
+  color: rgba(202, 210, 234, 0.86);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.metric-value {
+  color: #9be57d;
+  font-size: 27px;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: -0.75px;
+}
+
+.metric-session .metric-value { color: #9ca9ff; }
+
+.metric-note {
+  color: rgba(160, 173, 205, 0.72);
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.metric-decor {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  margin-left: auto;
+  align-self: flex-end;
+  border-radius: 50%;
+}
+
+.metric-total .metric-decor { color: #96e879; background: rgba(75, 145, 63, 0.17); }
+.metric-session .metric-decor { color: #a4b0ff; background: rgba(91, 106, 221, 0.18); }
+
+.activity-feed { min-height: 154px; max-height: 184px; }
+
+.log-line {
+  grid-template-columns: 75px 15px minmax(0, 1fr) minmax(82px, 0.48fr);
+  min-height: 31px;
+}
+
+.log-line.without-result .log-message { grid-column: 3 / 5; }
+
+.log-result {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(167, 179, 207, 0.7);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-row {
+  display: flex;
+  min-height: 28px;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.status-divider {
+  width: 1px;
+  height: 15px;
+  margin: 0 2px;
+  background: rgba(109, 122, 155, 0.55);
+}
+
+.coffee-break-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: rgba(213, 220, 242, 0.9);
+}
+
+.coffee-break-copy {
+  display: inline-flex;
+  gap: 5px;
+  color: rgba(194, 204, 231, 0.86);
+}
+
+.coffee-break-copy time { color: #b1beff; font-variant-numeric: tabular-nums; }
+
+.coffee-break-track {
+  display: block;
+  width: 96px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(110, 124, 167, 0.3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.coffee-break-track > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, #8b9cff, #aeb8ff);
+  box-shadow: 0 0 10px rgba(135, 151, 255, 0.6);
+  transition: transform 160ms linear;
+}
+
+@media (max-width: 560px) {
+  .metric-card { min-height: 102px; padding: 12px; }
+  .metric-icon { width: 46px; height: 46px; flex-basis: 46px; margin-right: 10px; }
+  .metric-value { font-size: 23px; }
+  .metric-decor { display: none; }
+  .log-line { grid-template-columns: 67px 13px minmax(0, 1fr); }
+  .log-result { display: none; }
+  .log-line .log-message { grid-column: 3 / 4; }
+  .coffee-break-copy > span { display: none; }
+  .coffee-break-track { width: 76px; }
+}
+
+/* Fixed desktop shell: only the Activity feed may scroll. Keeping the other
+   rows out of the flexible region prevents the dashboard, heading and coffee
+   break indicator from ever painting over one another. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.app-header,
+.account-card,
+.run-card,
+.stats-card,
+.status-row {
+  flex: 0 0 auto;
+}
+
+/* The compact proportions retain four readable activity rows at 680 × 840. */
+.run-mode { min-height: 142px; }
+.run-mode-main { min-height: 87px; }
+.run-mode-option { min-height: 54px; }
+.search-count,
+.browser-toggle { min-height: 58px; }
+.metric-card { min-height: 104px; }
+
+.activity-card {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.activity-card .card-header {
+  flex: 0 0 34px;
+  min-height: 34px;
+}
+
+.activity-feed {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.log-line {
+  min-height: 30px;
+  overflow: hidden;
+}
+
+.log-message,
+.log-result {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-row {
+  overflow: hidden;
+}
+
+.coffee-break-indicator {
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+
+.coffee-break-copy { flex: 0 0 auto; }
+.coffee-break-track { flex: 0 0 96px; }
+
+/* The reference ends at the runtime row; remove the spare footer so it does
+   not consume the feed's last visible line in the fixed desktop window. */
+.app-footer { display: none; }
+
+/* The log itself is the History entry point; no separate title or button is
+   needed, which matches the compact reference layout. */
+.activity-card {
+  cursor: pointer;
+}
+
+.activity-card .card-header { display: none; }
+
+.activity-feed {
+  border-color: rgba(66, 78, 108, 0.9);
+  cursor: pointer;
+}
+
+.activity-card:hover .activity-feed {
+  border-color: rgba(122, 139, 190, 0.88);
+  box-shadow: inset 0 1px 0 rgba(236, 240, 255, 0.035), 0 0 0 1px rgba(126, 143, 202, 0.1);
+}
+
+.activity-card:focus-visible { outline: none; }
+.activity-card:focus-visible .activity-feed {
+  border-color: #9eacff;
+  box-shadow: 0 0 0 2px rgba(135, 151, 255, 0.25);
+}
+
+/* Compact search-settings rail: the panel stays unified and its concise
+   values no longer reserve a full vertical column each. */
+.app { width: min(100%, 640px); }
+
+.run-settings {
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 0.92fr) minmax(0, 1.24fr);
+  gap: 4px;
+  padding: 0 8px;
+  overflow: visible;
+}
+
+.search-count,
+.browser-toggle {
+  min-height: 54px;
+  padding: 7px 6px;
+  border-left: 0 !important;
+  border-radius: 10px;
+}
+
+.search-count > span:not(.option-icon) {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.search-count small {
+  color: rgba(186, 198, 230, 0.92);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.search-count input[type="number"] {
+  width: 40px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.browser-toggle {
+  grid-template-columns: 30px minmax(0, 1fr) 38px;
+  gap: 8px;
+}
+
+.browser-toggle input[type="checkbox"] { right: 6px; }
+
+.search-count:focus-within,
+.browser-toggle:hover { background: rgba(127, 143, 255, 0.07); }

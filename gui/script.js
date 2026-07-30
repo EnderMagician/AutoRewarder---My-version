@@ -15,6 +15,8 @@ let balanceFetching = false;
 // intentionally separate from a normal Start run so the batch-only controls
 // can be restored to the account that was selected before the batch began.
 let batchRunning = false;
+let coffeeBreakTimer = null;
+let coffeeBreakHideTimer = null;
 
 // =========================================================================
 // Toasts
@@ -170,21 +172,118 @@ function detect_log_severity(msg) {
   const s = String(msg);
   if (/\[ERROR\]/i.test(s)) return 'error';
   if (/\[WARNING\]/i.test(s)) return 'warning';
-  if (/completed|success|done!|ready/i.test(s)) return 'success';
+  if (/completed|success|done!|ready|search|running|coffee break/i.test(s)) return 'success';
   return '';
 }
 
+function log_timestamp() {
+  return new Date().toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+
+function split_log_content(content) {
+  const text = String(content).trim();
+  const phase = text.match(/^=+\s*(.+?)\s*[—-]\s*(.+?)\s*=+$/);
+  if (phase) return { title: phase[1], result: phase[2] };
+
+  const detail = text.match(/^(.+?)(?:\s+—\s+|:\s+)(.+)$/);
+  if (detail) return { title: detail[1], result: detail[2] };
+  return { title: text, result: '' };
+}
+
+function clear_coffee_break() {
+  if (coffeeBreakTimer) window.clearInterval(coffeeBreakTimer);
+  if (coffeeBreakHideTimer) window.clearTimeout(coffeeBreakHideTimer);
+  coffeeBreakTimer = null;
+  coffeeBreakHideTimer = null;
+
+  const indicator = document.getElementById('coffee_break_indicator');
+  const divider = document.getElementById('coffee_break_divider');
+  if (indicator) indicator.hidden = true;
+  if (divider) divider.hidden = true;
+}
+
+function start_coffee_break(seconds) {
+  const duration = Number(seconds);
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  if (coffeeBreakTimer) window.clearInterval(coffeeBreakTimer);
+  if (coffeeBreakHideTimer) window.clearTimeout(coffeeBreakHideTimer);
+  coffeeBreakTimer = null;
+  coffeeBreakHideTimer = null;
+
+  const indicator = document.getElementById('coffee_break_indicator');
+  const divider = document.getElementById('coffee_break_divider');
+  const text = document.getElementById('coffee_break_text');
+  const track = document.getElementById('coffee_break_track');
+  const progress = document.getElementById('coffee_break_progress');
+  if (!indicator || !divider || !text || !track || !progress) return;
+
+  indicator.hidden = false;
+  divider.hidden = false;
+  const startedAt = performance.now();
+  const render = function () {
+    const elapsed = Math.min((performance.now() - startedAt) / 1000, duration);
+    const percent = Math.round((elapsed / duration) * 100);
+    const remaining = Math.max(0, Math.ceil(duration - elapsed));
+    progress.style.transform = `scaleX(${percent / 100})`;
+    track.setAttribute('aria-valuenow', String(percent));
+    text.textContent = remaining > 0 ? `${remaining}s remaining` : 'Resuming…';
+
+    if (remaining <= 0) {
+      window.clearInterval(coffeeBreakTimer);
+      coffeeBreakTimer = null;
+      coffeeBreakHideTimer = window.setTimeout(clear_coffee_break, 2200);
+    }
+  };
+
+  render();
+  coffeeBreakTimer = window.setInterval(render, 200);
+}
+
+function update_coffee_break(message) {
+  const text = String(message);
+  const duration = text.match(/Sleeping for\s+([\d.]+)\s+seconds to mimic a coffee break\./i);
+  if (duration) {
+    start_coffee_break(duration[1]);
+    return;
+  }
+  if (/Stop requested during coffee break|Stop requested.*halting/i.test(text)) {
+    clear_coffee_break();
+  }
+}
+
 function _new_log_line(message) {
-  const severity = detect_log_severity(message);
+  const raw = String(message);
+  const timestampMatch = raw.match(/^\s*\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$/);
+  const timestamp = timestampMatch ? timestampMatch[1] : log_timestamp();
+  const content = timestampMatch ? timestampMatch[2] : raw;
+  const severity = detect_log_severity(content);
+  const parts = split_log_content(content);
   const line = document.createElement('div');
   line.className = 'log-line' + (severity ? ' ' + severity : '');
+  if (!parts.result) line.classList.add('without-result');
 
-  // Preserve newlines without HTML: split → text nodes separated by <br>.
-  const parts = String(message).split('\n');
-  for (let i = 0; i < parts.length; i++) {
-    if (i > 0) line.appendChild(document.createElement('br'));
-    line.appendChild(document.createTextNode(parts[i]));
-  }
+  const time = document.createElement('time');
+  time.className = 'log-time';
+  time.textContent = '[' + timestamp + ']';
+
+  const marker = document.createElement('span');
+  marker.className = 'log-status-dot';
+  marker.setAttribute('aria-hidden', 'true');
+
+  const copy = document.createElement('span');
+  copy.className = 'log-message';
+  copy.textContent = parts.title;
+  copy.title = content;
+
+  const result = document.createElement('span');
+  result.className = 'log-result';
+  result.textContent = parts.result;
+  result.title = parts.result;
+
+  line.append(time, marker, copy, result);
   return line;
 }
 
@@ -192,7 +291,14 @@ function update_log(message) {
   const logDiv = document.getElementById('log_area');
   if (!logDiv) return;
 
-  logDiv.appendChild(_new_log_line(message));
+  // A backend message may contain several lines. Render each as an
+  // individually scannable activity row while retaining literal text.
+  String(message).split(/\r?\n/).forEach(function (entry) {
+    if (entry) {
+      update_coffee_break(entry);
+      logDiv.appendChild(_new_log_line(entry));
+    }
+  });
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
@@ -207,7 +313,8 @@ function update_log_link(text, linkLabel, url) {
   if (!logDiv) return;
 
   const line = _new_log_line(text);
-  line.appendChild(document.createTextNode(' '));
+  const copy = line.querySelector('.log-message');
+  copy.appendChild(document.createTextNode(' '));
 
   const a = document.createElement('a');
   a.href = '#';
@@ -218,7 +325,7 @@ function update_log_link(text, linkLabel, url) {
       pywebview.api.open_link(String(url));
     }
   });
-  line.appendChild(a);
+  copy.appendChild(a);
 
   logDiv.appendChild(line);
   logDiv.scrollTop = logDiv.scrollHeight;
@@ -236,6 +343,7 @@ function update_log_once(message) {
 // =========================================================================
 
 function start_bot() {
+  clear_coffee_break();
   if (batchRunning) {
     show_toast('A multi-account run is already in progress.', 'warning');
     return;
@@ -371,6 +479,7 @@ function update_batch_run_ui(state, account, completed, total, skipped) {
     }
     if (accountName) accountName.textContent = `Running ${account}`;
   } else if (!running) {
+    clear_coffee_break();
     if (progress) progress.hidden = true;
     if (accountName) accountName.textContent = 'Ready to start';
   }
@@ -380,6 +489,7 @@ function update_batch_run_ui(state, account, completed, total, skipped) {
 }
 
 async function start_all_accounts() {
+  clear_coffee_break();
   if (batchRunning) return;
   if (!_has_ready_account()) {
     show_toast('Finish First Setup for at least one account first.', 'warning');
@@ -465,6 +575,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function enable_start_button() {
+  clear_coffee_break();
   if (batchRunning) {
     set_batch_controls(true);
     return;
@@ -493,6 +604,7 @@ function stop_bot() {
     const stopLabel = stopBtn.querySelector('.stop-label');
     if (stopLabel) stopLabel.textContent = 'Stopping…';
   }
+  clear_coffee_break();
   pywebview.api.stop().catch(err => console.error('stop failed:', err));
 }
 
@@ -538,6 +650,13 @@ function update_status_indicator(forceState) {
 
 function show_history() {
   pywebview.api.open_history_window();
+}
+
+function open_history_from_activity(event) {
+  // Update notices can embed a link in the log. Let that link keep its own
+  // destination instead of opening the History window as well.
+  if (event && event.target && event.target.closest('a')) return;
+  show_history();
 }
 
 function show_stats() {

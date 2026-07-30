@@ -14,10 +14,10 @@
     <!-- ==================== Header ==================== -->
     <header class="app-header">
       <div class="brand">
-        <img class="brand-mark" src="../assets/chibi-avatar.png" alt="">
+        <img class="brand-mark" src="assets/chibi-avatar.png" alt="AutoRewarder mascot" width="62" height="62">
         <div class="brand-text">
           <h1>AutoRewarder</h1>
-          <span class="brand-sub">Microsoft Rewards · v4.2.1</span>
+          <span class="brand-sub">Microsoft Rewards · v4.2.2</span>
         </div>
       </div>
 
@@ -111,51 +111,56 @@
       </div>
     </section>
 
-    <!-- ==================== Stats card ==================== -->
-    <section class="card stats-card" id="stats_card" role="button" tabindex="0"
+    <!-- ==================== Dashboard metrics ==================== -->
+    <section class="stats-card" id="stats_card" role="button" tabindex="0"
              title="Open the statistics dashboard" onclick="show_stats()"
              onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); show_stats(); }">
-      <div class="card-header">
-        <div class="card-label">Stats</div>
-        <span class="ghost-link" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-          Dashboard
-        </span>
-      </div>
       <div class="stats-tiles">
-        <div class="stat-tile">
-          <span class="stat-value" id="stat_total">—</span>
-          <span class="stat-label" id="stat_total_label">Total points</span>
-        </div>
-        <div class="stat-tile">
-          <span class="stat-value" id="stat_session">—</span>
-          <span class="stat-label">Earned last run</span>
-        </div>
+        <article class="metric-card metric-total">
+          <span class="metric-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4H4v4a4 4 0 0 0 4 4M17 4h3v4a4 4 0 0 1-4 4M8 4h8v7a4 4 0 0 1-8 0z"></path></svg>
+          </span>
+          <span class="metric-copy">
+            <span class="metric-label" id="stat_total_label">Total points</span>
+            <span class="metric-value stat-value" id="stat_total">—</span>
+            <span class="metric-note">Microsoft Rewards balance</span>
+          </span>
+          <span class="metric-decor" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 9 9 13 13 20 6"></polyline><polyline points="15 6 20 6 20 11"></polyline></svg>
+          </span>
+        </article>
+        <article class="metric-card metric-session">
+          <span class="metric-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-1.7 13.79A5 5 0 1 0 16.9 21 7 7 0 0 0 12 2z"></path><path d="M9.5 16.5c.4-2.6 1.8-4.9 4.2-6.9.4 2.5-.5 4.9-2.8 7.1"></path></svg>
+          </span>
+          <span class="metric-copy">
+            <span class="metric-label">Earned last run</span>
+            <span class="metric-value stat-value" id="stat_session">—</span>
+            <span class="metric-note">Latest completed run</span>
+          </span>
+          <span class="metric-decor" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M8 12h2M14 12h2M8 16h2"></path></svg>
+          </span>
+        </article>
       </div>
     </section>
 
-    <!-- ==================== Activity card ==================== -->
-    <section class="card activity-card">
-      <div class="card-header">
-        <div class="card-label">Activity</div>
-        <button id="history_btn" class="ghost-link" type="button" onclick="show_history()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          View history
-        </button>
-      </div>
+    <!-- ==================== Activity log ==================== -->
+    <section class="activity-card" id="activity_card" role="button" tabindex="0"
+             aria-label="Open activity history" title="Open activity history"
+             onclick="open_history_from_activity(event)"
+             onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open_history_from_activity(event); }">
       <div id="log_area" class="activity-feed"></div>
     </section>
 
     <div class="status-row" aria-live="polite">
       <span class="dot" id="dot"></span>
       <span id="status_text">Loading…</span>
+      <span class="status-divider" id="coffee_break_divider" hidden aria-hidden="true"></span>
+      <span class="coffee-break-indicator" id="coffee_break_indicator" hidden>
+        <span class="coffee-break-copy"><span>Coffee break</span><time id="coffee_break_text">—</time></span>
+        <span class="coffee-break-track" id="coffee_break_track" role="progressbar" aria-label="Coffee break progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="coffee_break_progress"></span></span>
+      </span>
     </div>
 
     <footer class="app-footer">
