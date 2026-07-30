@@ -4,7 +4,7 @@ AppId=AutoRewarder
 AppVersion=4.2
 AppPublisher=Sino Safarov
 AppPublisherURL=https://github.com/safarsin
-DefaultDirName={pf}\AutoRewarder
+DefaultDirName={commonpf}\AutoRewarder
 DefaultGroupName=AutoRewarder
 OutputDir=dist
 OutputBaseFilename=AutoRewarder-Setup-v4.2
@@ -36,9 +36,6 @@ Filename: "{app}\AutoRewarder.exe"; Description: "Launch AutoRewarder"; Flags: n
 Filename: "https://github.com/safarsin/AutoRewarder/blob/main/USER_GUIDE.md"; Description: "Read User Guide on GitHub"; Flags: shellexec nowait postinstall
 Filename: "https://github.com/safarsin/AutoRewarder"; Description: "Open GitHub repository (leave a star if you find this app useful)"; Flags: shellexec nowait postinstall skipifsilent unchecked
 Filename: "https://buymeacoffee.com/safarsin"; Description: "Support development (Buy me a coffee)"; Flags: shellexec nowait postinstall skipifsilent unchecked
-
-[UninstallDelete]
-Type: dirifempty; Name: "{userappdata}\AutoRewarder"
 
 [Code]
 procedure ExitSetupWithError(ErrorMsg: String);
