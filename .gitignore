@@ -12,3 +12,5 @@ build/
 # Virtual environments
 .venv/
 venv/
+
+.agents/
