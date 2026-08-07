@@ -1,13 +1,13 @@
 [Setup]
 AppName=AutoRewarder
 AppId=AutoRewarder
-AppVersion=4.2.2
+AppVersion=4.2.3
 AppPublisher=Sino Safarov
 AppPublisherURL=https://github.com/safarsin
 DefaultDirName={commonpf}\AutoRewarder
 DefaultGroupName=AutoRewarder
 OutputDir=dist
-OutputBaseFilename=AutoRewarder-Setup-v4.2.2
+OutputBaseFilename=AutoRewarder-Setup-v4.2.3
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
@@ -32,8 +32,8 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Name: "startmenu"; Description: "Create Start Menu shortcut"; GroupDescription: "Additional tasks:"
 
 [Run]
-Filename: "{app}\AutoRewarder.exe"; Description: "Launch AutoRewarder"; Flags: nowait postinstall skipifsilent
-Filename: "https://github.com/safarsin/AutoRewarder/blob/main/USER_GUIDE.md"; Description: "Read User Guide on GitHub"; Flags: shellexec nowait postinstall
+Filename: "{app}\AutoRewarder.exe"; Description: "Launch AutoRewarder"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "https://github.com/safarsin/AutoRewarder/blob/main/USER_GUIDE.md"; Description: "Read User Guide on GitHub"; Flags: shellexec nowait postinstall unchecked
 Filename: "https://github.com/safarsin/AutoRewarder"; Description: "Open GitHub repository (leave a star if you find this app useful)"; Flags: shellexec nowait postinstall skipifsilent unchecked
 Filename: "https://buymeacoffee.com/safarsin"; Description: "Support development (Buy me a coffee)"; Flags: shellexec nowait postinstall skipifsilent unchecked
 
