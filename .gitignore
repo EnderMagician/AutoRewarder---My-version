@@ -12,3 +12,7 @@ build/
 # Virtual environments
 .venv/
 venv/
+
+.agents/
+.codex/
+.impeccable/

@@ -11,6 +11,12 @@ let driverWarmingUp = false;
 // True while a balance scrape holds a driver (launch refresh, manual refresh,
 // or account-switch refresh). Start must stay disabled during it too.
 let balanceFetching = false;
+// True while the fixed multi-account runner owns the backend lock. This is
+// intentionally separate from a normal Start run so the batch-only controls
+// can be restored to the account that was selected before the batch began.
+let batchRunning = false;
+let coffeeBreakTimer = null;
+let coffeeBreakHideTimer = null;
 
 // =========================================================================
 // Toasts
@@ -166,21 +172,118 @@ function detect_log_severity(msg) {
   const s = String(msg);
   if (/\[ERROR\]/i.test(s)) return 'error';
   if (/\[WARNING\]/i.test(s)) return 'warning';
-  if (/completed|success|done!|ready/i.test(s)) return 'success';
+  if (/completed|success|done!|ready|search|running|coffee break/i.test(s)) return 'success';
   return '';
 }
 
+function log_timestamp() {
+  return new Date().toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+
+function split_log_content(content) {
+  const text = String(content).trim();
+  const phase = text.match(/^=+\s*(.+?)\s*[—-]\s*(.+?)\s*=+$/);
+  if (phase) return { title: phase[1], result: phase[2] };
+
+  const detail = text.match(/^(.+?)(?:\s+—\s+|:\s+)(.+)$/);
+  if (detail) return { title: detail[1], result: detail[2] };
+  return { title: text, result: '' };
+}
+
+function clear_coffee_break() {
+  if (coffeeBreakTimer) window.clearInterval(coffeeBreakTimer);
+  if (coffeeBreakHideTimer) window.clearTimeout(coffeeBreakHideTimer);
+  coffeeBreakTimer = null;
+  coffeeBreakHideTimer = null;
+
+  const indicator = document.getElementById('coffee_break_indicator');
+  const divider = document.getElementById('coffee_break_divider');
+  if (indicator) indicator.hidden = true;
+  if (divider) divider.hidden = true;
+}
+
+function start_coffee_break(seconds) {
+  const duration = Number(seconds);
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  if (coffeeBreakTimer) window.clearInterval(coffeeBreakTimer);
+  if (coffeeBreakHideTimer) window.clearTimeout(coffeeBreakHideTimer);
+  coffeeBreakTimer = null;
+  coffeeBreakHideTimer = null;
+
+  const indicator = document.getElementById('coffee_break_indicator');
+  const divider = document.getElementById('coffee_break_divider');
+  const text = document.getElementById('coffee_break_text');
+  const track = document.getElementById('coffee_break_track');
+  const progress = document.getElementById('coffee_break_progress');
+  if (!indicator || !divider || !text || !track || !progress) return;
+
+  indicator.hidden = false;
+  divider.hidden = false;
+  const startedAt = performance.now();
+  const render = function () {
+    const elapsed = Math.min((performance.now() - startedAt) / 1000, duration);
+    const percent = Math.round((elapsed / duration) * 100);
+    const remaining = Math.max(0, Math.ceil(duration - elapsed));
+    progress.style.transform = `scaleX(${percent / 100})`;
+    track.setAttribute('aria-valuenow', String(percent));
+    text.textContent = remaining > 0 ? `${remaining}s remaining` : 'Resuming…';
+
+    if (remaining <= 0) {
+      window.clearInterval(coffeeBreakTimer);
+      coffeeBreakTimer = null;
+      coffeeBreakHideTimer = window.setTimeout(clear_coffee_break, 2200);
+    }
+  };
+
+  render();
+  coffeeBreakTimer = window.setInterval(render, 200);
+}
+
+function update_coffee_break(message) {
+  const text = String(message);
+  const duration = text.match(/Sleeping for\s+([\d.]+)\s+seconds to mimic a coffee break\./i);
+  if (duration) {
+    start_coffee_break(duration[1]);
+    return;
+  }
+  if (/Stop requested during coffee break|Stop requested.*halting/i.test(text)) {
+    clear_coffee_break();
+  }
+}
+
 function _new_log_line(message) {
-  const severity = detect_log_severity(message);
+  const raw = String(message);
+  const timestampMatch = raw.match(/^\s*\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$/);
+  const timestamp = timestampMatch ? timestampMatch[1] : log_timestamp();
+  const content = timestampMatch ? timestampMatch[2] : raw;
+  const severity = detect_log_severity(content);
+  const parts = split_log_content(content);
   const line = document.createElement('div');
   line.className = 'log-line' + (severity ? ' ' + severity : '');
+  if (!parts.result) line.classList.add('without-result');
 
-  // Preserve newlines without HTML: split → text nodes separated by <br>.
-  const parts = String(message).split('\n');
-  for (let i = 0; i < parts.length; i++) {
-    if (i > 0) line.appendChild(document.createElement('br'));
-    line.appendChild(document.createTextNode(parts[i]));
-  }
+  const time = document.createElement('time');
+  time.className = 'log-time';
+  time.textContent = '[' + timestamp + ']';
+
+  const marker = document.createElement('span');
+  marker.className = 'log-status-dot';
+  marker.setAttribute('aria-hidden', 'true');
+
+  const copy = document.createElement('span');
+  copy.className = 'log-message';
+  copy.textContent = parts.title;
+  copy.title = content;
+
+  const result = document.createElement('span');
+  result.className = 'log-result';
+  result.textContent = parts.result;
+  result.title = parts.result;
+
+  line.append(time, marker, copy, result);
   return line;
 }
 
@@ -188,7 +291,14 @@ function update_log(message) {
   const logDiv = document.getElementById('log_area');
   if (!logDiv) return;
 
-  logDiv.appendChild(_new_log_line(message));
+  // A backend message may contain several lines. Render each as an
+  // individually scannable activity row while retaining literal text.
+  String(message).split(/\r?\n/).forEach(function (entry) {
+    if (entry) {
+      update_coffee_break(entry);
+      logDiv.appendChild(_new_log_line(entry));
+    }
+  });
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
@@ -203,7 +313,8 @@ function update_log_link(text, linkLabel, url) {
   if (!logDiv) return;
 
   const line = _new_log_line(text);
-  line.appendChild(document.createTextNode(' '));
+  const copy = line.querySelector('.log-message');
+  copy.appendChild(document.createTextNode(' '));
 
   const a = document.createElement('a');
   a.href = '#';
@@ -214,7 +325,7 @@ function update_log_link(text, linkLabel, url) {
       pywebview.api.open_link(String(url));
     }
   });
-  line.appendChild(a);
+  copy.appendChild(a);
 
   logDiv.appendChild(line);
   logDiv.scrollTop = logDiv.scrollHeight;
@@ -232,6 +343,11 @@ function update_log_once(message) {
 // =========================================================================
 
 function start_bot() {
+  clear_coffee_break();
+  if (batchRunning) {
+    show_toast('A multi-account run is already in progress.', 'warning');
+    return;
+  }
   if (!currentAccountId) {
     show_toast('Add an account first.', 'warning');
     return;
@@ -288,14 +404,159 @@ function start_bot() {
   pywebview.api.main(pc, mobile, dailyOnly);
 }
 
+function _has_ready_account() {
+  return accountsCache.some(account => account.first_setup_done);
+}
+
+function get_control_state() {
+  const controls = window.AutoRewarderControlState;
+  if (!controls || typeof controls.getControlState !== 'function') {
+    return {
+      canStartSelected: false,
+      canRunAll: false,
+      hasReadyAccount: false,
+    };
+  }
+  return controls.getControlState({
+    accounts: accountsCache,
+    currentAccountId: currentAccountId,
+    driverWarmingUp: driverWarmingUp,
+    balanceFetching: balanceFetching,
+    batchRunning: batchRunning,
+  });
+}
+
+function set_batch_controls(running) {
+  batchRunning = Boolean(running);
+  const current = accountsCache.find(account => account.id === currentAccountId);
+  const controls = get_control_state();
+
+  if (batchRunning) {
+    toggle_account_menu(false);
+    close_accounts_modal();
+    close_settings_modal();
+  }
+
+  const startBtn = document.getElementById('start_btn');
+  if (startBtn) {
+    startBtn.disabled = !controls.canStartSelected;
+  }
+
+  const batchBtn = document.getElementById('batch_run_btn');
+  if (batchBtn) {
+    batchBtn.disabled = !controls.canRunAll;
+    const label = batchBtn.querySelector('.batch-btn-label');
+    if (!batchRunning && label) label.textContent = 'Run all accounts';
+  }
+
+  const batchToggle = document.getElementById('batchDailyTasksToggle');
+  if (batchToggle) batchToggle.disabled = batchRunning;
+
+  const dailyOnlyToggle = document.getElementById('dailyOnlyToggle');
+  if (dailyOnlyToggle) dailyOnlyToggle.disabled = batchRunning;
+  const pcField = document.getElementById('count_pc');
+  const mobileField = document.getElementById('count_mobile');
+  const dailyOnly = Boolean(dailyOnlyToggle && dailyOnlyToggle.checked);
+  if (pcField) pcField.disabled = batchRunning || dailyOnly;
+  if (mobileField) mobileField.disabled = batchRunning || dailyOnly;
+
+  const trigger = document.getElementById('account_trigger');
+  if (trigger) trigger.disabled = batchRunning || !current;
+  const manageBtn = document.getElementById('manageBtn');
+  if (manageBtn) manageBtn.disabled = batchRunning;
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) settingsBtn.disabled = batchRunning;
+
+  const stopBtn = document.getElementById('stop_btn');
+  if (stopBtn) {
+    stopBtn.disabled = !batchRunning;
+    const stopLabel = stopBtn.querySelector('.stop-label');
+    if (!batchRunning && stopLabel) stopLabel.textContent = 'Stop';
+  }
+}
+
+function update_batch_run_ui(state, account, completed, total, skipped) {
+  const running = state === 'running';
+  set_batch_controls(running);
+
+  const batchBtn = document.getElementById('batch_run_btn');
+  const label = batchBtn && batchBtn.querySelector('.batch-btn-label');
+  if (label) label.textContent = 'Run all accounts';
+
+  const progress = document.getElementById('batch_progress');
+  const progressText = document.getElementById('batch_progress_text');
+  const accountName = document.getElementById('batch_account_name');
+  const runnableTotal = Number(total || 0);
+  const skippedCount = Number(skipped || 0);
+  if (running && account && runnableTotal > 0) {
+    const current = Math.min(Number(completed || 0) + 1, runnableTotal);
+    if (progress) progress.hidden = false;
+    if (progressText) {
+      progressText.textContent =
+        `${current} of ${runnableTotal} remaining · ${skippedCount} skipped today`;
+    }
+    if (accountName) accountName.textContent = `Running ${account}`;
+  } else if (!running) {
+    clear_coffee_break();
+    if (progress) progress.hidden = true;
+    if (accountName) accountName.textContent = 'Ready to start';
+  }
+
+  update_status_indicator(running ? 'executing' : undefined);
+  if (!running) refresh_account_ui();
+}
+
+async function start_all_accounts() {
+  clear_coffee_break();
+  if (batchRunning) return;
+  if (!_has_ready_account()) {
+    show_toast('Finish First Setup for at least one account first.', 'warning');
+    return;
+  }
+
+  const toggle = document.getElementById('batchDailyTasksToggle');
+  const includeDailyTasks = Boolean(toggle && toggle.checked);
+  set_batch_controls(true);
+  update_status_indicator('executing');
+
+  try {
+    await pywebview.api.set_batch_include_daily_tasks(includeDailyTasks);
+    const result = await pywebview.api.run_all_accounts(includeDailyTasks);
+    if (!result) return;
+
+    const count = (result.completed_account_ids || []).length;
+    const skipped = (result.skipped_account_ids || []).length;
+    if (result.status === 'completed') {
+      show_toast(
+        `Batch completed: ${count} account${count === 1 ? '' : 's'} run, ${skipped} skipped.`,
+        'success'
+      );
+    } else if (result.status === 'stopped') {
+      show_toast('Batch stopped. Completed accounts will be skipped on retry.', 'warning');
+    } else if (result.status === 'busy') {
+      show_toast('Another AutoRewarder run is active. Try again after it finishes.', 'warning');
+    } else {
+      show_toast(
+        `Batch stopped at an account: ${result.error || 'unknown error'}.`,
+        'error'
+      );
+    }
+  } catch (err) {
+    console.error('run_all_accounts failed:', err);
+    show_toast('Could not start the multi-account run.', 'error');
+    set_batch_controls(false);
+    update_status_indicator();
+  }
+}
+
 function _sync_daily_only_ui() {
   const toggle = document.getElementById('dailyOnlyToggle');
   const pcField = document.getElementById('count_pc');
   const mobileField = document.getElementById('count_mobile');
   if (!toggle) return;
-  const off = toggle.checked;
-  if (pcField) pcField.disabled = off;
-  if (mobileField) mobileField.disabled = off;
+  const searchesDisabled = toggle.checked || batchRunning;
+  if (pcField) pcField.disabled = searchesDisabled;
+  if (mobileField) mobileField.disabled = searchesDisabled;
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -321,9 +582,22 @@ document.addEventListener('DOMContentLoaded', function () {
   };
   if (pcField) pcField.addEventListener('blur', save_counts);
   if (mobileField) mobileField.addEventListener('blur', save_counts);
+
+  const batchToggle = document.getElementById('batchDailyTasksToggle');
+  if (batchToggle) {
+    batchToggle.addEventListener('change', () => {
+      pywebview.api.set_batch_include_daily_tasks(Boolean(batchToggle.checked))
+        .catch(err => console.error('Failed to save batch Daily tasks setting:', err));
+    });
+  }
 });
 
 function enable_start_button() {
+  clear_coffee_break();
+  if (batchRunning) {
+    set_batch_controls(true);
+    return;
+  }
   const btn = document.getElementById('start_btn');
   const label = btn.querySelector('.btn-label');
   if (label) label.textContent = 'Start run';
@@ -348,6 +622,7 @@ function stop_bot() {
     const stopLabel = stopBtn.querySelector('.stop-label');
     if (stopLabel) stopLabel.textContent = 'Stopping…';
   }
+  clear_coffee_break();
   pywebview.api.stop().catch(err => console.error('stop failed:', err));
 }
 
@@ -360,10 +635,13 @@ function update_status_indicator(forceState) {
 
   let state = forceState;
   if (!state) {
+    if (batchRunning) state = 'executing';
     const current = accountsCache.find(a => a.id === currentAccountId);
-    if (!current) state = 'empty';
-    else if (!current.first_setup_done) state = 'setup';
-    else state = 'ready';
+    if (!state) {
+      if (!current) state = 'empty';
+      else if (!current.first_setup_done) state = 'setup';
+      else state = 'ready';
+    }
   }
 
   set_hide_browser_toggle_enabled(state !== 'executing');
@@ -392,6 +670,13 @@ function show_history() {
   pywebview.api.open_history_window();
 }
 
+function open_history_from_activity(event) {
+  // Update notices can embed a link in the log. Let that link keep its own
+  // destination instead of opening the History window as well.
+  if (event && event.target && event.target.closest('a')) return;
+  show_history();
+}
+
 function show_stats() {
   if (!window.pywebview || !pywebview.api || !pywebview.api.open_stats_window) return;
   pywebview.api.open_stats_window();
@@ -416,6 +701,11 @@ function set_stats_loading(on) {
   balanceFetching = Boolean(on);
   const card = document.getElementById('stats_card');
   if (card) card.classList.toggle('stats-loading', balanceFetching);
+
+  // Warm-up/balance refresh used to restore only the selected-account Start
+  // button, leaving Run all disabled when the initial refresh finished after
+  // the account list loaded.
+  set_batch_controls(batchRunning);
 
   // A balance scrape holds a driver on the profile → block Start meanwhile.
   const btn = document.getElementById('start_btn');
@@ -469,18 +759,34 @@ function refresh_stats_ui() {
 }
 
 function set_hide_browser_toggle_enabled(enabled) {
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (!toggle) return;
-  toggle.disabled = !enabled;
-  toggle.setAttribute('aria-disabled', String(!enabled));
-  const row = toggle.closest('.toggle-row');
-  if (row) row.classList.toggle('row-disabled', !enabled);
+  const button = document.getElementById('browser_visibility_btn');
+  if (!button) return;
+  button.disabled = !enabled;
+  button.setAttribute('aria-disabled', String(!enabled));
 }
 
-function hideBrowserToggle() {
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (!toggle) return;
-  pywebview.api.set_hide_browser(Boolean(toggle.checked));
+function set_browser_visibility_ui(hidden) {
+  const button = document.getElementById('browser_visibility_btn');
+  const label = document.getElementById('browser_visibility_label');
+  const hint = document.getElementById('browser_visibility_hint');
+  if (!button) return;
+  button.classList.toggle('is-hidden', Boolean(hidden));
+  button.setAttribute('aria-pressed', String(Boolean(hidden)));
+  button.setAttribute('aria-label', hidden ? 'Browser hidden' : 'Browser visible');
+  button.title = hidden ? 'Browser hidden' : 'Browser visible';
+  if (label) label.textContent = hidden ? 'Browser hidden' : 'Browser visible';
+  if (hint) hint.textContent = hidden ? 'Click to show it during runs' : 'Click to hide it during runs';
+}
+
+function toggle_browser_visibility() {
+  const button = document.getElementById('browser_visibility_btn');
+  if (!button || button.disabled) return;
+  const hidden = button.getAttribute('aria-pressed') !== 'true';
+  set_browser_visibility_ui(hidden);
+  pywebview.api.set_hide_browser(hidden).catch(err => {
+    console.error('Failed to save browser visibility:', err);
+    set_browser_visibility_ui(!hidden);
+  });
 }
 
 // =========================================================================
@@ -541,8 +847,10 @@ function render_account_menu() {
       check.setAttribute('stroke-linejoin', 'round');
       check.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
       btn.appendChild(check);
+      btn.disabled = batchRunning;
 
       btn.addEventListener('click', () => {
+        if (batchRunning) return;
         toggle_account_menu(false);
         if (acc.id !== currentAccountId) {
           pywebview.api.switch_account(acc.id).then(ok => {
@@ -565,10 +873,12 @@ function render_account_menu() {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'menu-action';
+  addBtn.disabled = batchRunning;
   addBtn.innerHTML =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
     '<span>Add account</span>';
   addBtn.addEventListener('click', () => {
+    if (batchRunning) return;
     toggle_account_menu(false);
     prompt_and_create_account();
   });
@@ -578,11 +888,13 @@ function render_account_menu() {
     const manageBtn = document.createElement('button');
     manageBtn.type = 'button';
     manageBtn.className = 'menu-action';
+    manageBtn.disabled = batchRunning;
     manageBtn.style.color = 'var(--text-muted)';
     manageBtn.innerHTML =
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
       '<span>Manage accounts…</span>';
     manageBtn.addEventListener('click', () => {
+      if (batchRunning) return;
       toggle_account_menu(false);
       open_accounts_modal();
     });
@@ -604,13 +916,13 @@ function render_account_trigger() {
     avatarEl.style.backgroundColor = avatar_color(current.id);
     labelEl.textContent = current.label;
     metaEl.textContent = current.first_setup_done ? 'Ready to run' : 'Setup pending';
-    trigger.disabled = false;
+    trigger.disabled = batchRunning;
   } else {
     avatarEl.textContent = '+';
     avatarEl.style.backgroundColor = 'var(--surface-3)';
     labelEl.textContent = 'No account yet';
     metaEl.textContent = accountsCache.length ? 'Select one below' : 'Add your first account';
-    trigger.disabled = accountsCache.length === 0 && false; // keep clickable to open menu
+    trigger.disabled = batchRunning; // keep empty-state picker clickable otherwise
   }
 }
 
@@ -619,6 +931,10 @@ function render_account_trigger() {
 // =========================================================================
 
 async function prompt_and_create_account() {
+  if (batchRunning) {
+    show_toast('Account changes are disabled while the batch is running.', 'warning');
+    return;
+  }
   const defaultLabel = `Account ${accountsCache.length + 1}`;
   const label = await prompt_modal(
     'Add a new account',
@@ -652,6 +968,10 @@ async function prompt_and_create_account() {
 // =========================================================================
 
 function open_accounts_modal() {
+  if (batchRunning) {
+    show_toast('Account changes are disabled while the batch is running.', 'warning');
+    return;
+  }
   const backdrop = document.getElementById('accounts_modal');
   if (!backdrop) return;
   backdrop.hidden = false;
@@ -670,6 +990,10 @@ function close_accounts_modal() {
 // =========================================================================
 
 function open_settings_modal() {
+  if (batchRunning) {
+    show_toast('Settings are disabled while the batch is running.', 'warning');
+    return;
+  }
   const backdrop = document.getElementById('settings_modal');
   if (!backdrop) return;
 
@@ -1141,13 +1465,17 @@ function refresh_account_ui() {
 
     // Start button.
     const startBtn = document.getElementById('start_btn');
-    const current = accountsCache.find(a => a.id === currentAccountId);
     const busy = driverWarmingUp || balanceFetching;
-    const shouldEnable = Boolean(current && current.first_setup_done) && !busy;
+    const controls = get_control_state();
     const label = startBtn.querySelector('.btn-label');
-    if (!label || label.textContent === 'Start run' || label.textContent === 'Loading…') {
-      startBtn.disabled = !shouldEnable;
+    if (!batchRunning && (!label || label.textContent === 'Start run' || label.textContent === 'Loading…')) {
+      startBtn.disabled = !controls.canStartSelected;
       if (label) label.textContent = busy ? 'Loading…' : 'Start run';
+    }
+
+    const batchBtn = document.getElementById('batch_run_btn');
+    if (batchBtn && !batchRunning) {
+      batchBtn.disabled = !controls.canRunAll;
     }
 
     update_status_indicator();
@@ -1175,6 +1503,9 @@ function start_loader() {
 
   // Block Start until the warmup finishes.
   driverWarmingUp = true;
+  // The account list may resolve before or after warm-up. Rendering both
+  // dispatch actions from the same state prevents a stale batch button.
+  set_batch_controls(batchRunning);
   const startBtn = document.getElementById('start_btn');
   if (startBtn) {
     startBtn.disabled = true;
@@ -1223,6 +1554,7 @@ function stop_loader() {
       if (label) label.textContent = 'Start run';
     }
   }
+  set_batch_controls(batchRunning);
   update_status_indicator();
 }
 
@@ -1231,9 +1563,8 @@ function stop_loader() {
 // =========================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Hide-browser toggle.
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (toggle) toggle.addEventListener('change', hideBrowserToggle);
+  const browserVisibility = document.getElementById('browser_visibility_btn');
+  if (browserVisibility) browserVisibility.addEventListener('click', toggle_browser_visibility);
 
   // Empty-state CTA.
   const cta = document.getElementById('empty_cta');
@@ -1336,8 +1667,11 @@ window.addEventListener('pywebviewready', function() {
   }
 
   pywebview.api.get_settings().then(function(settings) {
-    const toggle = document.getElementById('hideBrowserToggle');
-    if (toggle) toggle.checked = Boolean(settings.hide_browser);
+    set_browser_visibility_ui(Boolean(settings.hide_browser));
+    const batchToggle = document.getElementById('batchDailyTasksToggle');
+    if (batchToggle) {
+      batchToggle.checked = Boolean(settings.batch_include_daily_tasks);
+    }
   });
 
   // Load saved query counts from global settings.
