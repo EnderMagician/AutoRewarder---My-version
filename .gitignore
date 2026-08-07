@@ -16,3 +16,6 @@ venv/
 .agents/
 .codex/
 .impeccable/
+docs/
+DESIGN.md
+PRODUCT.md

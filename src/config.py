@@ -10,7 +10,7 @@ import os
 import platform
 import sys
 
-CURRENT_VERSION = "v4.2.4"
+CURRENT_VERSION = "v4.2.5"
 REPO = "EnderMagician/AutoRewarder---My-version"
 
 PLATFORM_NAME = platform.system()

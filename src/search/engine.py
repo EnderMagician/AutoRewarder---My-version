@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException, WebDriverException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from ..utils import human_typing
 from ..emulator import HumanBehavior
@@ -162,8 +164,11 @@ class SearchEngine:
                     searches_since_break = 0
                     self._log(f"Next coffee break after {next_coffee_break} searches.")
 
-                # Find the search box, clear it
-                search_box = driver.find_element(By.NAME, "q")
+                # Bing can render the search field several seconds after the
+                # page shell, especially on a fresh account profile.
+                search_box = WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[name='q'], textarea[name='q']"))
+                )
                 search_box.clear()
 
                 # Log the search query in log area
