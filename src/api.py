@@ -602,6 +602,32 @@ class AutoRewarderAPI:
         """Return the merged schedule for one account."""
         return AccountMetaManager(account_id).get_schedule()
 
+    def _get_batch_query_counts(self, schedule):
+        """Return usable search counts for a batch account.
+
+        Older account metadata can contain ``0/0`` after the schedule editor
+        was saved while the schedule was disabled.  That should not abort a
+        manual batch; use the current global counts as the compatibility
+        fallback while preserving any non-zero per-account value.
+        """
+        try:
+            pc = max(0, min(130, int(schedule.get("queries_pc", 0))))
+        except (AttributeError, TypeError, ValueError):
+            pc = 0
+        try:
+            mobile = max(0, min(99, int(schedule.get("queries_mobile", 0))))
+        except (AttributeError, TypeError, ValueError):
+            mobile = 0
+
+        if pc == 0 and mobile == 0:
+            pc = self.global_settings.get_queries_pc()
+            mobile = self.global_settings.get_queries_mobile()
+            self.log(
+                "[WARNING] Account schedule has no search counts; "
+                f"using global defaults PC={pc}, Mobile={mobile}."
+            )
+        return pc, mobile
+
     def _is_account_completed_today(self, account_id):
         """Return whether an account has a successful run recorded today."""
         from datetime import date
@@ -722,9 +748,10 @@ class AutoRewarderAPI:
                     skipped=skipped_count,
                 )
                 schedule = self._get_account_schedule(account_id)
+                pc_count, mobile_count = self._get_batch_query_counts(schedule)
                 outcome = self._run_current_account(
-                    schedule.get("queries_pc", 0),
-                    schedule.get("queries_mobile", 0),
+                    pc_count,
+                    mobile_count,
                     include_daily_tasks=bool(include_daily_tasks),
                 )
                 if outcome.get("completed"):
@@ -1925,6 +1952,37 @@ class AutoRewarderAPI:
             return []
         return self.history.get_history()
 
+    def get_run_history(self):
+        """Return newest-first structured run summaries for the current account."""
+        if self.stats is None:
+            return []
+        stats = self.stats.get_stats()
+        recent_runs = stats.get("recent_runs", [])
+        if not isinstance(recent_runs, list):
+            recent_runs = []
+        runs = list(reversed([run for run in recent_runs if isinstance(run, dict)]))
+        if runs:
+            return runs
+
+        # Profiles created before the run ledger only have a last-session
+        # summary. Surface that single record until a new structured run is
+        # recorded, rather than showing an apparently empty history.
+        last_session = stats.get("last_session", {})
+        if not isinstance(last_session, dict) or not last_session.get("ended_at"):
+            return []
+        return [{
+            "ended_at": last_session.get("ended_at"),
+            "status": "recorded",
+            "error": None,
+            "pc_searches": last_session.get("pc_searches", 0),
+            "mobile_searches": last_session.get("mobile_searches", 0),
+            "daily_cards": last_session.get("daily_cards", 0),
+            "earn_cards": last_session.get("earn_cards", 0),
+            "quest_tasks": last_session.get("quest_tasks", 0),
+            "points_estimate": last_session.get("points_estimate", 0),
+            "points_delta": last_session.get("points_delta"),
+        }]
+
     # ------------------------------------------------------------------
     # Statistics (scoped to current account)
     # ------------------------------------------------------------------
@@ -2469,7 +2527,7 @@ class AutoRewarderAPI:
             outcome["stopped"] = self._stop_event.is_set()
             return outcome
         finally:
-            self._record_session_stats()
+            self._record_session_stats(outcome=outcome)
 
     def _watch_scheduled_stop_request(self, lease):
         """Return an event that stops the watcher for an external batch request."""
@@ -2570,7 +2628,7 @@ class AutoRewarderAPI:
             if daily_only:
                 self._reset_session_state()
                 outcome = self._run_daily_only()
-                self._record_session_stats()
+                self._record_session_stats(outcome=outcome)
             else:
                 outcome = self._run_current_account(
                     pc_count,
@@ -2617,7 +2675,7 @@ class AutoRewarderAPI:
         if value is not None:
             self._last_scraped_balance = value
 
-    def _record_session_stats(self):
+    def _record_session_stats(self, outcome=None):
         """
         Fold this run's accumulated counters + scraped balance into stats.json
         and ask the GUI (if attached) to refresh the stats card.
@@ -2632,6 +2690,7 @@ class AutoRewarderAPI:
                 earn_cards=self._session_counts.get("earn", 0),
                 quest_tasks=self._session_counts.get("quests", 0),
                 balance=self._last_scraped_balance,
+                outcome=outcome,
             )
         except Exception as e:
             self.log(f"[WARNING] Failed to record stats: {e}")

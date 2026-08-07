@@ -408,10 +408,28 @@ function _has_ready_account() {
   return accountsCache.some(account => account.first_setup_done);
 }
 
+function get_control_state() {
+  const controls = window.AutoRewarderControlState;
+  if (!controls || typeof controls.getControlState !== 'function') {
+    return {
+      canStartSelected: false,
+      canRunAll: false,
+      hasReadyAccount: false,
+    };
+  }
+  return controls.getControlState({
+    accounts: accountsCache,
+    currentAccountId: currentAccountId,
+    driverWarmingUp: driverWarmingUp,
+    balanceFetching: balanceFetching,
+    batchRunning: batchRunning,
+  });
+}
+
 function set_batch_controls(running) {
   batchRunning = Boolean(running);
   const current = accountsCache.find(account => account.id === currentAccountId);
-  const busy = driverWarmingUp || balanceFetching;
+  const controls = get_control_state();
 
   if (batchRunning) {
     toggle_account_menu(false);
@@ -421,12 +439,12 @@ function set_batch_controls(running) {
 
   const startBtn = document.getElementById('start_btn');
   if (startBtn) {
-    startBtn.disabled = batchRunning || !(current && current.first_setup_done) || busy;
+    startBtn.disabled = !controls.canStartSelected;
   }
 
   const batchBtn = document.getElementById('batch_run_btn');
   if (batchBtn) {
-    batchBtn.disabled = batchRunning || !_has_ready_account() || busy;
+    batchBtn.disabled = !controls.canRunAll;
     const label = batchBtn.querySelector('.batch-btn-label');
     if (!batchRunning && label) label.textContent = 'Run all accounts';
   }
@@ -684,6 +702,11 @@ function set_stats_loading(on) {
   const card = document.getElementById('stats_card');
   if (card) card.classList.toggle('stats-loading', balanceFetching);
 
+  // Warm-up/balance refresh used to restore only the selected-account Start
+  // button, leaving Run all disabled when the initial refresh finished after
+  // the account list loaded.
+  set_batch_controls(batchRunning);
+
   // A balance scrape holds a driver on the profile → block Start meanwhile.
   const btn = document.getElementById('start_btn');
   if (!btn) return;
@@ -736,18 +759,34 @@ function refresh_stats_ui() {
 }
 
 function set_hide_browser_toggle_enabled(enabled) {
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (!toggle) return;
-  toggle.disabled = !enabled;
-  toggle.setAttribute('aria-disabled', String(!enabled));
-  const row = toggle.closest('.toggle-row');
-  if (row) row.classList.toggle('row-disabled', !enabled);
+  const button = document.getElementById('browser_visibility_btn');
+  if (!button) return;
+  button.disabled = !enabled;
+  button.setAttribute('aria-disabled', String(!enabled));
 }
 
-function hideBrowserToggle() {
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (!toggle) return;
-  pywebview.api.set_hide_browser(Boolean(toggle.checked));
+function set_browser_visibility_ui(hidden) {
+  const button = document.getElementById('browser_visibility_btn');
+  const label = document.getElementById('browser_visibility_label');
+  const hint = document.getElementById('browser_visibility_hint');
+  if (!button) return;
+  button.classList.toggle('is-hidden', Boolean(hidden));
+  button.setAttribute('aria-pressed', String(Boolean(hidden)));
+  button.setAttribute('aria-label', hidden ? 'Browser hidden' : 'Browser visible');
+  button.title = hidden ? 'Browser hidden' : 'Browser visible';
+  if (label) label.textContent = hidden ? 'Browser hidden' : 'Browser visible';
+  if (hint) hint.textContent = hidden ? 'Click to show it during runs' : 'Click to hide it during runs';
+}
+
+function toggle_browser_visibility() {
+  const button = document.getElementById('browser_visibility_btn');
+  if (!button || button.disabled) return;
+  const hidden = button.getAttribute('aria-pressed') !== 'true';
+  set_browser_visibility_ui(hidden);
+  pywebview.api.set_hide_browser(hidden).catch(err => {
+    console.error('Failed to save browser visibility:', err);
+    set_browser_visibility_ui(!hidden);
+  });
 }
 
 // =========================================================================
@@ -1426,18 +1465,17 @@ function refresh_account_ui() {
 
     // Start button.
     const startBtn = document.getElementById('start_btn');
-    const current = accountsCache.find(a => a.id === currentAccountId);
     const busy = driverWarmingUp || balanceFetching;
-    const shouldEnable = Boolean(current && current.first_setup_done) && !busy;
+    const controls = get_control_state();
     const label = startBtn.querySelector('.btn-label');
     if (!batchRunning && (!label || label.textContent === 'Start run' || label.textContent === 'Loading…')) {
-      startBtn.disabled = !shouldEnable;
+      startBtn.disabled = !controls.canStartSelected;
       if (label) label.textContent = busy ? 'Loading…' : 'Start run';
     }
 
     const batchBtn = document.getElementById('batch_run_btn');
     if (batchBtn && !batchRunning) {
-      batchBtn.disabled = !_has_ready_account() || busy;
+      batchBtn.disabled = !controls.canRunAll;
     }
 
     update_status_indicator();
@@ -1465,6 +1503,9 @@ function start_loader() {
 
   // Block Start until the warmup finishes.
   driverWarmingUp = true;
+  // The account list may resolve before or after warm-up. Rendering both
+  // dispatch actions from the same state prevents a stale batch button.
+  set_batch_controls(batchRunning);
   const startBtn = document.getElementById('start_btn');
   if (startBtn) {
     startBtn.disabled = true;
@@ -1513,6 +1554,7 @@ function stop_loader() {
       if (label) label.textContent = 'Start run';
     }
   }
+  set_batch_controls(batchRunning);
   update_status_indicator();
 }
 
@@ -1521,9 +1563,8 @@ function stop_loader() {
 // =========================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Hide-browser toggle.
-  const toggle = document.getElementById('hideBrowserToggle');
-  if (toggle) toggle.addEventListener('change', hideBrowserToggle);
+  const browserVisibility = document.getElementById('browser_visibility_btn');
+  if (browserVisibility) browserVisibility.addEventListener('click', toggle_browser_visibility);
 
   // Empty-state CTA.
   const cta = document.getElementById('empty_cta');
@@ -1626,8 +1667,7 @@ window.addEventListener('pywebviewready', function() {
   }
 
   pywebview.api.get_settings().then(function(settings) {
-    const toggle = document.getElementById('hideBrowserToggle');
-    if (toggle) toggle.checked = Boolean(settings.hide_browser);
+    set_browser_visibility_ui(Boolean(settings.hide_browser));
     const batchToggle = document.getElementById('batchDailyTasksToggle');
     if (batchToggle) {
       batchToggle.checked = Boolean(settings.batch_include_daily_tasks);
