@@ -1,8 +1,8 @@
 # AutoRewarder
 
-![Stars](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/safarsin/023d6f9c9aa602f6afbb7f5c1e2fe9ee/raw/stars.json)
+![Stars](https://img.shields.io/github/stars/EnderMagician/AutoRewarder---My-version?style=for-the-badge&label=STARS&color=e3b341)
 
-![Downloads](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/safarsin/023d6f9c9aa602f6afbb7f5c1e2fe9ee/raw/downloads.json)
+![Downloads](https://img.shields.io/github/downloads/EnderMagician/AutoRewarder---My-version/total?style=for-the-badge&label=DOWNLOADS&color=3FB950)
 
 An advanced, set-and-forget automation tool for Microsoft Rewards (supporting both the legacy and new dashboards). AutoRewarder performs Bing searches for PC and mobile point collection using a massive dataset of realistic queries (with optional, bring-your-own-key AI generation), completes Daily Sets and More Activities, and uses mathematically driven, human-like input simulation (W3C Actions, Bezier curves, smart scrolling and realistic keyboard typos).
 
