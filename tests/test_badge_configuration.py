@@ -3,7 +3,6 @@
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
 REPOSITORY = "EnderMagician/AutoRewarder---My-version"
 

@@ -1970,18 +1970,20 @@ class AutoRewarderAPI:
         last_session = stats.get("last_session", {})
         if not isinstance(last_session, dict) or not last_session.get("ended_at"):
             return []
-        return [{
-            "ended_at": last_session.get("ended_at"),
-            "status": "recorded",
-            "error": None,
-            "pc_searches": last_session.get("pc_searches", 0),
-            "mobile_searches": last_session.get("mobile_searches", 0),
-            "daily_cards": last_session.get("daily_cards", 0),
-            "earn_cards": last_session.get("earn_cards", 0),
-            "quest_tasks": last_session.get("quest_tasks", 0),
-            "points_estimate": last_session.get("points_estimate", 0),
-            "points_delta": last_session.get("points_delta"),
-        }]
+        return [
+            {
+                "ended_at": last_session.get("ended_at"),
+                "status": "recorded",
+                "error": None,
+                "pc_searches": last_session.get("pc_searches", 0),
+                "mobile_searches": last_session.get("mobile_searches", 0),
+                "daily_cards": last_session.get("daily_cards", 0),
+                "earn_cards": last_session.get("earn_cards", 0),
+                "quest_tasks": last_session.get("quest_tasks", 0),
+                "points_estimate": last_session.get("points_estimate", 0),
+                "points_delta": last_session.get("points_delta"),
+            }
+        ]
 
     # ------------------------------------------------------------------
     # Statistics (scoped to current account)

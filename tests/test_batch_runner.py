@@ -129,7 +129,9 @@ class BatchRunnerTests(unittest.TestCase):
         self.assertEqual(["ready-a", "ready-b"], api.marked)
         self.assertEqual("original", api.account_manager.current_id())
 
-    def test_batch_progress_excludes_completed_today_accounts_from_remaining_total(self):
+    def test_batch_progress_excludes_completed_today_accounts_from_remaining_total(
+        self,
+    ):
         """Catch a UI counter that includes accounts skipped for today's marker."""
         api = self._api(
             {
@@ -178,7 +180,9 @@ class BatchRunnerTests(unittest.TestCase):
         )
         self.assertEqual("original", api.account_manager.current_id())
 
-    def test_batch_requests_an_existing_scheduled_run_to_stop_before_acquiring_lock(self):
+    def test_batch_requests_an_existing_scheduled_run_to_stop_before_acquiring_lock(
+        self,
+    ):
         api = self._api(
             {
                 "ready-a": {"completed": True, "stopped": False, "error": None},
