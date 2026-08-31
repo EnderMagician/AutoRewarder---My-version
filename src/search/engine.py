@@ -335,11 +335,7 @@ class SearchEngine:
                 visual_search_button = driver.find_element(By.ID, "sb_sbi")
                 time.sleep(random.uniform(1, 3))
 
-            self._log("Button was found - success")
-
             human.click_element(visual_search_button)
-
-            self._log("Button was clicked - success")
 
             if not portable_mode:
                 upload_input = wait.until(
@@ -347,8 +343,6 @@ class SearchEngine:
                 )
             else:
                 upload_input = driver.find_element(By.ID, "sb_fileinput")
-
-            self._log("Upload input was found - success")
 
             time.sleep(random.uniform(1, 4))
 
