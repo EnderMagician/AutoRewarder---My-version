@@ -158,8 +158,8 @@ This feature uses a rotating pool of base images, random cropping, and varied JP
 
 The visual-search flow is designed to:
 - run as part of the daily task cycle or after the PC phase, if the task is not already completed
-- produce 54,684 unique variations per image, generates over 1.6 million different upload variants to keep your account safe
-- keep the process human-like with natural mouse movement, randomized delays,and natural page scrolling after upload
+- produce 54,684 unique variations per image, generating over 1.6 million different upload variants to keep your account safe
+- keep the process human-like with natural mouse movement, randomized delays, and natural page scrolling after upload
 
 > [!NOTE]
 > The app tracks visual-search completion per day and per account, so the task does not get repeated.

@@ -62,6 +62,10 @@ See the [Development Setup](#development-setup-for-developers) section.
 | :---: | :---: |
 |<img src="assets/screenshots/daily_sets_demo_v4.0.gif">|<img src="assets/screenshots/tab_perform.gif">|
 
+| Visual Search |
+| :---: |
+|<img src="assets/screenshots/visual_search_demo_v4.2.gif">|
+
 <details>
   <summary><b>View Legacy Dashboard Demo (click to expand)</b></summary>
 
@@ -246,6 +250,7 @@ AutoRewarder/
 ├── assets/
 │   ├── icon.ico               # App icon
 │   ├── queries.json           # Queries list (8154 unique queries)
+│   ├── visual_search_assets/  # Visual search assets
 │   └── screenshots/           # Screenshots and GIFs for documentation
 ├── src/
 │   ├── __init__.py            # Python package initialization
