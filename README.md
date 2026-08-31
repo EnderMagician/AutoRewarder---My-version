@@ -4,7 +4,7 @@
 
 ![Downloads](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/safarsin/023d6f9c9aa602f6afbb7f5c1e2fe9ee/raw/downloads.json)
 
-An advanced, set-and-forget automation tool for Microsoft Rewards (supporting both the legacy and new dashboards). AutoRewarder performs Bing searches for PC and mobile point collection using a massive dataset of realistic queries (with optional, bring-your-own-key AI generation), completes Daily Sets and More Activities, and uses mathematically driven, human-like input simulation (W3C Actions, Bezier curves, smart scrolling and realistic keyboard typos).
+An advanced, set-and-forget automation tool for Microsoft Rewards (supporting both the legacy and new dashboards). AutoRewarder performs Bing searches for PC and mobile point collection using a massive dataset of realistic queries (with optional, bring-your-own-key AI generation), completes Daily Sets and More Activities, includes Bing Visual Search tasks, and uses mathematically driven, human-like input simulation (W3C Actions, Bezier curves, smart scrolling and realistic keyboard typos).
 
 Built with a robust Python/Selenium backend, it offers two modes of operation: a sleek HTML/CSS/JS frontend wrapped in a native window via pywebview, and a headless runner (CLI) for scheduled background runs and automation scripts. Packaged as an executable Windows app (via Inno Setup) for a seamless, plug-and-play experience.
 
@@ -14,15 +14,20 @@ Built with a robust Python/Selenium backend, it offers two modes of operation: a
 
 ## Table of Contents
 
+### Getting Started
 - [Installation](#installation)
-- [Screenshots & Demo](#screenshots--demo)
-- [Tech Stack](#tech-stack)
-- [System Requirements](#system-requirements)
-- [Features](#features)
 - [Quick Start (For Users)](#quick-start-for-users)
 - [Development Setup (For Developers)](#development-setup-for-developers)
+
+### Product Overview
+- [Screenshots & Demo](#screenshots--demo)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [System Requirements](#system-requirements)
 - [CLI Usage](#cli-usage)
 - [Build & Distribution](#build--distribution)
+
+### Reference
 - [Project Structure](#project-structure)
 - [Runtime Data](#runtime-data)
 - [Troubleshooting](#troubleshooting)
@@ -43,7 +48,7 @@ Download `AutoRewarder.zip` from the [latest release](https://github.com/safarsi
 > **Note:** Because the portable version is a single-file build, it may take a few seconds longer to start up compared to the installed version while it unpacks core components. Once open, it works at full speed.
 
 **Manual Way (Source):**
-Clone this repo, create virtual environment, and run `python AutoRewarder.py`.
+See the [Development Setup](#development-setup-for-developers) section.
 
 ---
 
@@ -124,11 +129,13 @@ Clone this repo, create virtual environment, and run `python AutoRewarder.py`.
 - Configurable run pacing (advanced scheduling with run duration and queries per hour)
 - Background WebDriver warmup at startup for faster execution
 - Human-like search behavior (typing delays, random pauses, smooth scrolling)
+- Visual Search integration for Bing tasks in both daily-task and standard workflows
+- Hash-bypass architecture that generates a large pool of image variants to avoid file-hash checks
 - Mobile emulation for Rewards credit (iPhone UA and touch)
 - Uses real-world queries from assets/queries.json (8154 unique entries from google-trends dataset)
 - Randomized delays to reduce repetitive patterns
 - Optional tab switching between result categories (Images/Videos/News)
-- Natural mouse movement/clicking (W3C Actions)
+- Natural mouse movement/clicking (W3C Actions/randomized Bezier trajectories)
 - Daily Set task collection (runs once per day, per account)
 - Separate browser profile per account
 - AI-generated search queries in your language (bring-your-own-key LLM)
@@ -254,7 +261,7 @@ AutoRewarder/
 │   │   ├── human.py           # Human-like mouse / touch / scrolling
 │   │   └── edge_policy.py     # Windows-only Edge auto-signin opt-out
 │   ├── search/                # Bing query execution + history
-│   │   ├── engine.py          # Search loop with human-like delays
+│   │   ├── engine.py          # Search loop with human-like delays/Visual Search
 │   │   ├── history.py         # Per-account search history JSON
 │   │   ├── llm.py             # LLM-based query generation
 │   │   └── locale.py          # Localization detection (language, region)
@@ -301,7 +308,7 @@ accounts/
 	<account_id>/
 		EdgeProfile/   # Separate Edge profile for WebDriver
 		history.json   # Search history (date, time, query, status)
-		status.json    # Daily Set completion status (per-day)
+		status.json    # Daily Set/Visual Search completion status (per-day)
 		stats.json     # Statistics: scraped points balance + activity counters
 		meta.json      # Per-account metadata (first_setup_done, schedule)
 background_log.txt # Logs from the background runner (for debugging)
@@ -339,7 +346,7 @@ For common issues and solutions, see the [Troubleshooting](USER_GUIDE.md#trouble
 - [x] The New Dashboard Support
 - [x] AI-generated search queries in your language (bring-your-own-key LLM)
 - [x] Simulated human typos in search queries (via nlpaug)
-- [ ] Visual search
+- [x] Visual search integration
 - [ ] View background logs directly in the UI
 - [ ] Custom OpenAI compatible endpoints
 - [ ] Human typos simulation for different keyboard/language layouts (AZERTY, QWERTZ, etc.)
