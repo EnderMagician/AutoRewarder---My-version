@@ -53,7 +53,7 @@ if __name__ == "__main__":
         width=640,
         height=840,
         resizable=False,
-        background_color="#080c16",
+        background_color="#0e0b14",
     )
     api.set_window(window)  # pass window reference to AutoRewarderAPI for logging
 

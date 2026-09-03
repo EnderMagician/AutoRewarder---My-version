@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="ender-observatory">
 <head>
   <meta charset="UTF-8">
   <title>Run History</title>
@@ -16,6 +16,7 @@
     <p class="history-intro">Each entry records what a run actually completed, not every search term it used.</p>
     <section id="run_ledger" class="run-ledger" aria-live="polite"><p class="empty-row">Loading dispatch history…</p></section>
   </main>
+  <script src="theme.js"></script>
   <script>
     function fmt(value) { return value == null ? '—' : Number(value).toLocaleString(); }
     function when(value) { const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]} · ${m[4]}` : 'Unknown time'; }
@@ -41,6 +42,7 @@
       });
     }
     window.addEventListener('pywebviewready', () => {
+      pywebview.api.get_settings().then(settings => window.AutoRewarderTheme.applyTheme(settings.ui_theme)).catch(() => {});
       pywebview.api.get_current_account().then(account => { const pill = document.getElementById('account_pill'); if (account) { pill.hidden = false; pill.textContent = account.label; } });
       pywebview.api.get_run_history().then(render).catch(() => render([]));
     });

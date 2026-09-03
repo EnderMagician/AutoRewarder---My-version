@@ -116,6 +116,9 @@ class GlobalSettingsManager:
             # detected_locale (navigator.language) or OS detection.
             "search_locale": "auto",
             "detected_locale": "",  # filled by the GUI from navigator.language
+            # UI theme is intentionally global so all app windows share one
+            # visual world whenever they are opened or refreshed.
+            "ui_theme": "ender-observatory",
         }
 
         if APP_DIR and not os.path.exists(APP_DIR):
@@ -241,6 +244,17 @@ class GlobalSettingsManager:
         settings = self.get_settings()
         settings["detected_locale"] = str(locale or "").strip()
         self.save_settings(settings)
+
+    def set_ui_theme(self, theme):
+        """Persist a supported visual theme without accepting arbitrary CSS values."""
+        allowed = {"ender-observatory", "overworld-workshop", "nether-relay"}
+        selected = str(theme or "").strip()
+        if selected not in allowed:
+            selected = "ender-observatory"
+        settings = self.get_settings()
+        settings["ui_theme"] = selected
+        self.save_settings(settings)
+        return selected
 
     def get_effective_locale(self):
         """Return the locale that query generation will actually use."""

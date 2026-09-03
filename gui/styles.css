@@ -696,3 +696,199 @@ select:focus { border-color: var(--blue); outline: none; box-shadow: var(--focus
   .metric-card { min-height: 82px; }
   .metric-decor { display: none; }
 }
+
+/* Ender Observatory: shared by the dispatcher and both secondary windows. */
+html[data-theme="ender-observatory"] {
+  --bg: #0e0b14;
+  --surface: #1b1722;
+  --surface-muted: #272131;
+  --surface-soft: #15121c;
+  --line: #484052;
+  --line-strong: #766785;
+  --text: #f2f1e9;
+  --muted: #c0b7cc;
+  --muted-strong: #e1d9e9;
+  --green: #c3f279;
+  --green-soft: #2c3f28;
+  --blue: #c2a3ff;
+  --blue-soft: #382a58;
+  --amber: #f1c766;
+  --amber-soft: #4b391d;
+  --red: #ff9b97;
+  --red-soft: #4a252f;
+  --shadow: 0 5px 16px rgba(0, 0, 0, 0.45);
+  --shadow-raised: 0 20px 42px rgba(0, 0, 0, 0.7);
+  --radius: 3px;
+  --radius-sm: 1px;
+  --focus: 0 0 0 3px rgba(195, 242, 121, 0.42);
+}
+
+html[data-theme="ender-observatory"] body {
+  background-color: var(--bg);
+  background-image: linear-gradient(rgba(14, 11, 20, 0.88), rgba(14, 11, 20, 0.94)), url("assets/themes/ender/end-stone.png");
+  background-size: auto, 96px 96px;
+  image-rendering: pixelated;
+}
+
+html[data-theme="ender-observatory"] ::selection { background: #8e73c2; color: #fff; }
+html[data-theme="ender-observatory"] button:focus-visible,
+html[data-theme="ender-observatory"] input:focus-visible,
+html[data-theme="ender-observatory"] select:focus-visible,
+html[data-theme="ender-observatory"] [tabindex]:focus-visible { outline: 2px solid #c3f279; outline-offset: 2px; box-shadow: none; }
+
+html[data-theme="ender-observatory"] .app { padding-top: 18px; }
+html[data-theme="ender-observatory"] .app-header {
+  min-height: 58px;
+  padding: 7px 9px;
+  border: 1px solid #5f526c;
+  background: linear-gradient(90deg, rgba(30, 24, 39, 0.97), rgba(24, 20, 31, 0.95)), url("assets/themes/ender/crying-obsidian.png");
+  background-size: auto, 42px 42px;
+  box-shadow: var(--shadow);
+}
+html[data-theme="ender-observatory"] .brand { gap: 10px; }
+html[data-theme="ender-observatory"] .brand-mark { border: 2px solid #b399e4; border-radius: 0; background: #211b2d; box-shadow: 0 0 0 2px #17131d; image-rendering: pixelated; }
+html[data-theme="ender-observatory"] .brand h1 { color: #f7f2ff; font-weight: 800; letter-spacing: -.02em; }
+html[data-theme="ender-observatory"] .brand-sub { color: #d4c6e8; }
+html[data-theme="ender-observatory"] .icon-ghost,
+html[data-theme="ender-observatory"] .icon-btn { border-color: #60506d; background: #211a2a; color: #dfd0f5; }
+html[data-theme="ender-observatory"] .icon-ghost:hover:not(:disabled),
+html[data-theme="ender-observatory"] .icon-btn:hover:not(:disabled) { border-color: #c3f279; background: #352745; color: #f4ffdd; }
+
+html[data-theme="ender-observatory"] .account-trigger,
+html[data-theme="ender-observatory"] .run-card,
+html[data-theme="ender-observatory"] .stats-card,
+html[data-theme="ender-observatory"] .activity-card {
+  border-color: #544a60;
+  background-color: rgba(27, 23, 34, 0.96);
+}
+html[data-theme="ender-observatory"] .account-trigger { background-image: linear-gradient(90deg, transparent, rgba(183, 142, 255, 0.11)), url("assets/themes/ender/chorus-flower.png"); background-position: right 18px center, right 7px center; background-repeat: no-repeat; background-size: auto, 38px 38px; }
+html[data-theme="ender-observatory"] .account-trigger:hover:not(:disabled),
+html[data-theme="ender-observatory"] .account-picker.open .account-trigger { border-color: #bda2e8; background-color: #241d2e; }
+html[data-theme="ender-observatory"] .avatar { border-radius: 2px; background: #c3f279; color: #1a2418; }
+html[data-theme="ender-observatory"] .section-kicker,
+html[data-theme="ender-observatory"] .settings-group-title { color: #d7c3ff; }
+html[data-theme="ender-observatory"] .run-mode { border-color: #4d425b; background: #17131e; }
+html[data-theme="ender-observatory"] .run-mode-single { background-image: linear-gradient(140deg, rgba(195, 242, 121, 0.11), transparent 56%); }
+html[data-theme="ender-observatory"] .run-mode-batch { background-image: linear-gradient(140deg, rgba(194, 163, 255, 0.16), transparent 56%); }
+html[data-theme="ender-observatory"] .run-mode-main { border-radius: 1px; }
+html[data-theme="ender-observatory"] .run-mode-single .run-mode-main { background: #c3f279; color: #172016; }
+html[data-theme="ender-observatory"] .run-mode-batch .run-mode-main { background: #7d5db0; color: #fff; }
+html[data-theme="ender-observatory"] .run-mode-main:hover:not(:disabled) { filter: brightness(1.08); }
+html[data-theme="ender-observatory"] .run-settings { border-top-color: #4d425b; background: #15121c; }
+html[data-theme="ender-observatory"] .browser-visibility-btn.is-hidden { border-color: #c3f279; background: #253226; }
+html[data-theme="ender-observatory"] .stats-card:hover,
+html[data-theme="ender-observatory"] .activity-card:hover { border-color: #bda2e8; }
+html[data-theme="ender-observatory"] .metric-card { background: #1b1722; }
+html[data-theme="ender-observatory"] .metric-total { background-image: linear-gradient(135deg, rgba(195, 242, 121, 0.13), transparent 65%); }
+html[data-theme="ender-observatory"] .metric-session { background-image: linear-gradient(135deg, rgba(194, 163, 255, 0.14), transparent 65%); }
+html[data-theme="ender-observatory"] .activity-card { background: #111018; }
+html[data-theme="ender-observatory"] .activity-feed { color: #e9e0f2; scrollbar-color: #857194 #17131e; }
+html[data-theme="ender-observatory"] .log-time { color: #bbaec7; }
+html[data-theme="ender-observatory"] .log-line { border-bottom-color: rgba(224, 211, 240, 0.12); }
+html[data-theme="ender-observatory"] .log-line.success .log-status-dot { background: #c3f279; }
+html[data-theme="ender-observatory"] .log-line.success .log-message { color: #e0ffc2; }
+html[data-theme="ender-observatory"] .log-line.warning .log-status-dot { background: #f1c766; }
+html[data-theme="ender-observatory"] .log-line.error .log-status-dot { background: #ff9b97; }
+html[data-theme="ender-observatory"] .empty-overlay,
+html[data-theme="ender-observatory"] .modal-backdrop { background: rgba(8, 6, 12, 0.74); }
+html[data-theme="ender-observatory"] .empty-card,
+html[data-theme="ender-observatory"] .modal-box { border-color: #78698a; background-color: #1b1722; background-image: linear-gradient(rgba(27, 23, 34, 0.96), rgba(27, 23, 34, 0.96)), url("assets/themes/ender/end-stone.png"); background-size: auto, 80px 80px; }
+html[data-theme="ender-observatory"] .primary-btn-lg,
+html[data-theme="ender-observatory"] .btn-primary { border-color: #c3f279; background: #c3f279; color: #172016; }
+html[data-theme="ender-observatory"] .primary-btn-lg:hover,
+html[data-theme="ender-observatory"] .btn-primary:hover { background: #d7ff94; }
+html[data-theme="ender-observatory"] .btn-secondary,
+html[data-theme="ender-observatory"] .secondary-btn { border-color: #78698a; background: #282031; color: #eee5f8; }
+html[data-theme="ender-observatory"] .settings-row + .settings-row,
+html[data-theme="ender-observatory"] .settings-group,
+html[data-theme="ender-observatory"] .modal-header,
+html[data-theme="ender-observatory"] .modal-footer { border-color: #4c4258; }
+html[data-theme="ender-observatory"] .schedule-card,
+html[data-theme="ender-observatory"] .account-item { border-color: #574b65; background: #201b28; }
+html[data-theme="ender-observatory"] .account-item.current { border-color: #c3f279; background: #293526; }
+
+/* Shared theme frame: each world supplies material without changing workflows. */
+html[data-theme="overworld-workshop"] {
+  --bg: #263226; --surface: #f1ead7; --surface-muted: #e2ddc9; --surface-soft: #d5d8bb;
+  --line: #879570; --line-strong: #617950; --text: #273423; --muted: #52604b; --muted-strong: #354633;
+  --green: #3f783e; --green-soft: #d7e9c7; --blue: #387da1; --blue-soft: #d5e8ed;
+  --amber: #b77035; --amber-soft: #f2ddba; --red: #a84943; --red-soft: #f2cfca;
+  --shadow: 0 5px 16px rgba(17, 27, 16, .34); --shadow-raised: 0 20px 42px rgba(17, 27, 16, .48);
+  --radius: 3px; --radius-sm: 1px; --focus: 0 0 0 3px rgba(63, 120, 62, .35);
+  --theme-texture: url("assets/themes/overworld/grass-block-top.png");
+  --theme-header-texture: url("assets/themes/overworld/stone.png");
+  --theme-primary: #3f783e; --theme-secondary: #387da1; --theme-accent: #4d8d45;
+}
+
+html[data-theme="nether-relay"] {
+  --bg: #160f12; --surface: #25191c; --surface-muted: #352124; --surface-soft: #1c1417;
+  --line: #62413e; --line-strong: #956057; --text: #fff0dc; --muted: #d5b9a4; --muted-strong: #f1d8c3;
+  --green: #76dfc4; --green-soft: #1f4945; --blue: #7bd3d0; --blue-soft: #1b4a4a;
+  --amber: #ffae4b; --amber-soft: #52321b; --red: #ff8771; --red-soft: #50242a;
+  --shadow: 0 5px 16px rgba(0, 0, 0, .52); --shadow-raised: 0 20px 42px rgba(0, 0, 0, .72);
+  --radius: 3px; --radius-sm: 1px; --focus: 0 0 0 3px rgba(118, 223, 196, .4);
+  --theme-texture: url("assets/themes/nether/blackstone.png");
+  --theme-header-texture: url("assets/themes/nether/warped-nylium.png");
+  --theme-primary: #ff9e3d; --theme-secondary: #237f7a; --theme-accent: #76dfc4;
+}
+
+html[data-theme="overworld-workshop"] body,
+html[data-theme="nether-relay"] body { background-color: var(--bg); background-image: linear-gradient(rgba(0, 0, 0, .18), rgba(0, 0, 0, .32)), var(--theme-texture); background-size: auto, 96px 96px; image-rendering: pixelated; }
+html[data-theme="overworld-workshop"] ::selection { background: #78aa65; color: #fff; }
+html[data-theme="nether-relay"] ::selection { background: #b74f3d; color: #fff; }
+html[data-theme="overworld-workshop"] button:focus-visible,
+html[data-theme="nether-relay"] button:focus-visible,
+html[data-theme="overworld-workshop"] input:focus-visible,
+html[data-theme="nether-relay"] input:focus-visible,
+html[data-theme="overworld-workshop"] select:focus-visible,
+html[data-theme="nether-relay"] select:focus-visible,
+html[data-theme="overworld-workshop"] [tabindex]:focus-visible,
+html[data-theme="nether-relay"] [tabindex]:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; box-shadow: none; }
+html[data-theme="overworld-workshop"] .app-header,
+html[data-theme="nether-relay"] .app-header { padding: 7px 9px; border: 1px solid var(--line-strong); background-color: var(--surface); background-image: linear-gradient(rgba(0, 0, 0, .14), rgba(0, 0, 0, .14)), var(--theme-header-texture); background-size: auto, 42px 42px; box-shadow: var(--shadow); }
+html[data-theme="overworld-workshop"] .brand-mark,
+html[data-theme="nether-relay"] .brand-mark { border: 2px solid var(--theme-accent); border-radius: 0; background: var(--surface-soft); box-shadow: 0 0 0 2px var(--bg); image-rendering: pixelated; }
+html[data-theme="overworld-workshop"] .account-trigger,
+html[data-theme="nether-relay"] .account-trigger,
+html[data-theme="overworld-workshop"] .run-card,
+html[data-theme="nether-relay"] .run-card,
+html[data-theme="overworld-workshop"] .stats-card,
+html[data-theme="nether-relay"] .stats-card,
+html[data-theme="overworld-workshop"] .activity-card,
+html[data-theme="nether-relay"] .activity-card { border-color: var(--line-strong); background-color: var(--surface); }
+html[data-theme="overworld-workshop"] .run-mode,
+html[data-theme="nether-relay"] .run-mode { border-color: var(--line); background: var(--surface-soft); }
+html[data-theme="overworld-workshop"] .run-mode-single .run-mode-main,
+html[data-theme="nether-relay"] .run-mode-single .run-mode-main { background: var(--theme-primary); color: #fff; }
+html[data-theme="overworld-workshop"] .run-mode-batch .run-mode-main,
+html[data-theme="nether-relay"] .run-mode-batch .run-mode-main { background: var(--theme-secondary); color: #fff; }
+html[data-theme="overworld-workshop"] .metric-card,
+html[data-theme="nether-relay"] .metric-card { background: var(--surface); }
+html[data-theme="overworld-workshop"] .activity-card,
+html[data-theme="nether-relay"] .activity-card { background: var(--surface-soft); }
+html[data-theme="overworld-workshop"] .activity-feed,
+html[data-theme="nether-relay"] .activity-feed { color: var(--text); scrollbar-color: var(--line-strong) var(--surface-soft); }
+html[data-theme="overworld-workshop"] .empty-overlay,
+html[data-theme="nether-relay"] .empty-overlay,
+html[data-theme="overworld-workshop"] .modal-backdrop,
+html[data-theme="nether-relay"] .modal-backdrop { background: rgba(0, 0, 0, .62); }
+html[data-theme="overworld-workshop"] .empty-card,
+html[data-theme="nether-relay"] .empty-card,
+html[data-theme="overworld-workshop"] .modal-box,
+html[data-theme="nether-relay"] .modal-box { border-color: var(--line-strong); background-color: var(--surface); background-image: linear-gradient(rgba(0, 0, 0, .03), rgba(0, 0, 0, .03)), var(--theme-texture); background-size: auto, 80px 80px; }
+html[data-theme="overworld-workshop"] .primary-btn-lg,
+html[data-theme="nether-relay"] .primary-btn-lg,
+html[data-theme="overworld-workshop"] .btn-primary,
+html[data-theme="nether-relay"] .btn-primary { border-color: var(--theme-primary); background: var(--theme-primary); color: #fff; }
+
+.theme-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.theme-option { position: relative; display: grid; min-height: 92px; cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); overflow: hidden; }
+.theme-option input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+.theme-option > span { display: grid; align-content: end; gap: 5px; min-height: 100%; padding: 10px; border: 2px solid transparent; }
+.theme-option b { font-size: 11px; }.theme-option small { color: var(--muted); font-size: 9px; line-height: 1.3; }
+.theme-option input:checked + span { border-color: var(--green); }
+.theme-option input:focus-visible + span { outline: 2px solid var(--green); outline-offset: -4px; }
+.ender-option { background: #201a29 url("assets/themes/ender/chorus-flower.png") right 9px top 8px / 32px no-repeat; }.ender-option b { color: #e0cdff; }
+.overworld-option { background: #e4e2c9 url("assets/themes/overworld/grass-block-top.png") right 9px top 8px / 32px no-repeat; }.overworld-option b { color: #365d36; }.overworld-option small { color: #52604b; }
+.nether-option { background: #2a1c1f url("assets/themes/nether/warped-nylium.png") right 9px top 8px / 32px no-repeat; }.nether-option b { color: #ffbf86; }
+@media (max-width: 560px) { .theme-picker { grid-template-columns: 1fr; }.theme-option { min-height: 58px; } }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="ender-observatory">
 <head>
   <meta charset="UTF-8">
   <title>AutoRewarder</title>
@@ -14,10 +14,10 @@
     <!-- ==================== Header ==================== -->
     <header class="app-header">
       <div class="brand">
-        <img class="brand-mark" src="assets/chibi-avatar.png" alt="AutoRewarder mascot" width="62" height="62">
+        <img class="brand-mark" src="assets/themes/ender/chorus-flower.png" alt="Chorus flower emblem" width="62" height="62">
         <div class="brand-text">
           <h1>AutoRewarder</h1>
-          <span class="brand-sub">Microsoft Rewards · v4.2.6</span>
+          <span class="brand-sub">Microsoft Rewards · v4.2.7</span>
         </div>
       </div>
 
@@ -235,6 +235,25 @@
         </section>
 
         <section class="settings-group">
+          <div class="settings-group-title">Appearance</div>
+          <p class="settings-group-hint">Choose the visual world used in every AutoRewarder window.</p>
+          <div class="theme-picker" role="radiogroup" aria-label="App appearance">
+            <label class="theme-option ender-option">
+              <input type="radio" name="uiTheme" value="ender-observatory">
+              <span><b>Ender Observatory</b><small>Obsidian, chorus violet, Ender green</small></span>
+            </label>
+            <label class="theme-option overworld-option">
+              <input type="radio" name="uiTheme" value="overworld-workshop">
+              <span><b>Overworld Workshop</b><small>Grass, stone, and calm daylight</small></span>
+            </label>
+            <label class="theme-option nether-option">
+              <input type="radio" name="uiTheme" value="nether-relay">
+              <span><b>Nether Relay</b><small>Blackstone, lava, and warped teal</small></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-group">
           <div class="settings-group-title">Search terms</div>
           <label class="settings-row">
             <div class="settings-row-text">
@@ -342,6 +361,7 @@
   </div>
 
   <script src="control-state.js"></script>
+  <script src="theme.js"></script>
   <script src="script.js"></script>
   <script src="settings.js"></script>
 

@@ -1011,6 +1011,13 @@ function close_accounts_modal() {
 // Settings modal (general + scheduled run)
 // =========================================================================
 
+let themeBeforeSettings = 'ender-observatory';
+
+function selected_ui_theme() {
+  const selected = document.querySelector('input[name="uiTheme"]:checked');
+  return selected ? selected.value : 'ender-observatory';
+}
+
 function open_settings_modal() {
   if (batchRunning) {
     show_toast('Settings are disabled while the batch is running.', 'warning');
@@ -1024,7 +1031,8 @@ function open_settings_modal() {
     pywebview.api.get_launch_on_startup(),
     pywebview.api.get_close_to_tray(),
     pywebview.api.get_llm_config(),
-  ]).then(([schedules, startup, closeToTray, llmConfig]) => {
+    pywebview.api.get_settings(),
+  ]).then(([schedules, startup, closeToTray, llmConfig, settings]) => {
     render_schedule_cards(schedules || []);
 
     // Start-with-Windows toggle — disable row on unsupported OS.
@@ -1066,6 +1074,9 @@ function open_settings_modal() {
       localeHint.textContent =
         `Detected language: ${eff}. Leave "auto" to follow your system, or enter a locale like fr-FR.`;
     }
+    themeBeforeSettings = window.AutoRewarderTheme.applyTheme(settings && settings.ui_theme);
+    const themeRadio = document.querySelector(`input[name="uiTheme"][value="${themeBeforeSettings}"]`);
+    if (themeRadio) themeRadio.checked = true;
     apply_llm_field_state();
   }).catch(err => {
     console.error('Failed to load settings:', err);
@@ -1076,6 +1087,7 @@ function open_settings_modal() {
 }
 
 function close_settings_modal() {
+  window.AutoRewarderTheme.applyTheme(themeBeforeSettings);
   const backdrop = document.getElementById('settings_modal');
   if (backdrop) backdrop.hidden = true;
 }
@@ -1348,6 +1360,7 @@ async function save_settings() {
   const cards = Array.from(document.querySelectorAll('#schedule_accounts_list .schedule-card'));
   const closeToTrayWanted = document.getElementById('closeToTrayToggle').checked;
   const startupWanted = document.getElementById('startupToggle').checked;
+  const themeWanted = selected_ui_theme();
 
   // Validate + collect payloads per account.
   const payloads = [];
@@ -1438,10 +1451,12 @@ async function save_settings() {
     // Close-to-tray: persist unconditionally. The backend reads it at next
     // app launch, so saving each time is cheap and avoids a stale state.
     const closeToTrayCall = pywebview.api.set_close_to_tray(closeToTrayWanted);
+    const themeCall = pywebview.api.set_ui_theme(themeWanted);
 
-    const results = await Promise.all([...scheduleCalls, startupCall, closeToTrayCall]);
-    const startupOk = results[results.length - 2];
-    const scheduleResults = results.slice(0, -2);
+    const results = await Promise.all([...scheduleCalls, startupCall, closeToTrayCall, themeCall]);
+    const startupOk = results[results.length - 3];
+    const themeSaved = results[results.length - 1];
+    const scheduleResults = results.slice(0, -3);
     const failures = scheduleResults.filter(ok => !ok).length;
 
     if (failures > 0) {
@@ -1453,6 +1468,7 @@ async function save_settings() {
     } else {
       show_toast('Settings saved.', 'success');
     }
+    themeBeforeSettings = window.AutoRewarderTheme.applyTheme(themeSaved);
     close_settings_modal();
   } catch (err) {
     console.error('save_settings failed:', err);
@@ -1627,6 +1643,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if (settingsCancel) settingsCancel.addEventListener('click', close_settings_modal);
   const settingsSave = document.getElementById('settingsSave');
   if (settingsSave) settingsSave.addEventListener('click', save_settings);
+  document.querySelectorAll('input[name="uiTheme"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) window.AutoRewarderTheme.applyTheme(radio.value);
+    });
+  });
 
   // LLM feature toggle dims/undims its config fields live.
   const llmToggle = document.getElementById('llmToggle');
@@ -1689,6 +1710,7 @@ window.addEventListener('pywebviewready', function() {
   }
 
   pywebview.api.get_settings().then(function(settings) {
+    window.AutoRewarderTheme.applyTheme(settings.ui_theme);
     set_browser_visibility_ui(Boolean(settings.hide_browser));
     const batchToggle = document.getElementById('batchDailyTasksToggle');
     if (batchToggle) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="ender-observatory">
 <head>
   <meta charset="UTF-8">
   <title>Statistics</title>
@@ -122,6 +122,7 @@
 
   </div>
 
+  <script src="theme.js"></script>
   <script>
     const PALETTE = ['#5b8eff', '#e879a0', '#f59e0b', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#22d3ee'];
 
@@ -454,6 +455,9 @@
     }
 
     window.addEventListener('pywebviewready', function () {
+      pywebview.api.get_settings().then(function (settings) {
+        window.AutoRewarderTheme.applyTheme(settings.ui_theme);
+      }).catch(function () {});
       pywebview.api.get_current_account().then(render_pill);
       pywebview.api.get_all_stats().then(render_accounts);
       const btn = document.getElementById('refresh_btn');

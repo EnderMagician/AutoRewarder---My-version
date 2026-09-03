@@ -16,3 +16,29 @@ body { min-height: 100%; overflow: auto; background: #080c16; }
 .run-points { color: var(--green); font-variant-numeric: tabular-nums; font-weight: 800; }.status-failed .run-points { color: var(--red); }
 .run-details { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0 14px 15px 38px; color: var(--muted-strong); font-size: 12px; }.run-error { flex-basis: 100%; margin: 4px 0 0; color: var(--red); }
 .empty-row { padding: 32px 0; color: var(--muted); text-align: center; }
+
+html[data-theme="ender-observatory"] .history-shell { padding-top: 32px; }
+html[data-theme="ender-observatory"] .history-header { padding: 14px; border: 1px solid #5d5169; background: linear-gradient(90deg, rgba(29, 23, 38, .98), rgba(22, 18, 29, .95)), url("assets/themes/ender/crying-obsidian.png"); background-size: auto, 42px 42px; box-shadow: var(--shadow); }
+html[data-theme="ender-observatory"] .history-header p { color: #c3f279; }
+html[data-theme="ender-observatory"] .history-header h1 { color: #faf6ff; font-weight: 800; }
+html[data-theme="ender-observatory"] .history-intro { padding: 0 14px; color: #d0c5db; }
+html[data-theme="ender-observatory"] .run-ledger { border-color: #51465d; }
+html[data-theme="ender-observatory"] .run-entry { border-color: #51465d; background: #1b1722; }
+html[data-theme="ender-observatory"] .run-entry summary:hover { background: #272031; }
+html[data-theme="ender-observatory"] .run-signal { background: #c3f279; box-shadow: 0 0 10px rgba(195, 242, 121, .42); }
+html[data-theme="ender-observatory"] .status-stopped .run-signal { background: #f1c766; box-shadow: 0 0 10px rgba(241, 199, 102, .4); }
+html[data-theme="ender-observatory"] .status-failed .run-signal { background: #ff9b97; box-shadow: 0 0 10px rgba(255, 155, 151, .4); }
+html[data-theme="ender-observatory"] .run-points { color: #c3f279; }
+
+html[data-theme="overworld-workshop"] .history-header,
+html[data-theme="nether-relay"] .history-header { padding: 14px; border: 1px solid var(--line-strong); background-color: var(--surface); background-image: linear-gradient(rgba(0, 0, 0, .14), rgba(0, 0, 0, .14)), var(--theme-header-texture); background-size: auto, 42px 42px; box-shadow: var(--shadow); }
+html[data-theme="overworld-workshop"] .history-header p,
+html[data-theme="nether-relay"] .history-header p,
+html[data-theme="overworld-workshop"] .run-points,
+html[data-theme="nether-relay"] .run-points { color: var(--theme-primary); }
+html[data-theme="overworld-workshop"] .run-entry,
+html[data-theme="nether-relay"] .run-entry { border-color: var(--line); background: var(--surface); }
+html[data-theme="overworld-workshop"] .run-entry summary:hover,
+html[data-theme="nether-relay"] .run-entry summary:hover { background: var(--surface-muted); }
+html[data-theme="overworld-workshop"] .run-signal,
+html[data-theme="nether-relay"] .run-signal { background: var(--theme-primary); box-shadow: none; }

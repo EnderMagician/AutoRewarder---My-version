@@ -255,7 +255,7 @@ class AutoRewarderAPI:
             width=700,
             height=500,
             resizable=True,
-            background_color="#0d1117",
+            background_color="#0e0b14",
             text_select=True,
         )
 
@@ -281,7 +281,7 @@ class AutoRewarderAPI:
             "width": 760,
             "height": 620,
             "resizable": True,
-            "background_color": "#0b0d12",
+            "background_color": "#0e0b14",
             "text_select": True,
         }
 
@@ -457,6 +457,12 @@ class AutoRewarderAPI:
         self.global_settings.set_close_to_tray(value)
         state = "ON (X → tray)" if value else "OFF (X → quit)"
         self.log(f"Close-to-tray: {state}. Restart to apply.")
+
+    def set_ui_theme(self, theme):
+        """Persist the selected app theme for the main and secondary windows."""
+        selected = self.global_settings.set_ui_theme(theme)
+        self.log(f"UI theme selected: {selected}.")
+        return selected
 
     def get_queries_counts(self):
         """

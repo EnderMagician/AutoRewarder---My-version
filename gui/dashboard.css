@@ -11,3 +11,49 @@ body { min-height: 100%; overflow: auto; background: #080c16; color: var(--text)
 .runs-chart { display: flex; align-items: end; gap: 8px; min-height: 190px; padding: 14px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }.bar-col { flex: 0 0 30px; display: flex; height: 158px; flex-direction: column; align-items: center; justify-content: end; gap: 5px; }.bar-cap, .bar-day { color: var(--muted); font-size: 10px; }.bar-stack { display: flex; width: 22px; flex-direction: column-reverse; overflow: hidden; background: #0a101c; }.bar-seg { min-height: 1px; }.bar-pc { background: var(--green); }.bar-mobile { background: var(--blue); }.bar-daily { background: var(--amber); }.bar-earn { background: #9f7aea; }.bar-quests { background: #f687b3; }.chart-legend { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 11px; }.legend-dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; }.legend-pc{background:var(--green)}.legend-mobile{background:var(--blue)}.legend-daily{background:var(--amber)}.legend-earn{background:#9f7aea}.legend-quests{background:#f687b3}
 .dash-table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); background: var(--surface); }.dash-table th { color: var(--green); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }.dash-table th,.dash-table td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }.dash-table .num { text-align: right; font-variant-numeric: tabular-nums; }.acc-cell { display: inline-flex; gap: 8px; align-items: center; }.dash-empty,.dash-empty-row { color: var(--muted); padding: 20px; text-align: center; }
 @media (max-width: 560px) { .dash { padding: 18px; }.dash-hero { grid-template-columns: 1fr; }.metric-grid { grid-template-columns: repeat(2,1fr); }.metric:nth-child(3n) { border-right: 1px solid var(--line); }.metric:nth-child(2n) { border-right: 0; }.chart-legend { display: none; } }
+
+html[data-theme="ender-observatory"] .dash { padding-top: 32px; }
+html[data-theme="ender-observatory"] .dash-header { padding: 11px 13px; border: 1px solid #5d5169; background: linear-gradient(90deg, rgba(29, 23, 38, .98), rgba(22, 18, 29, .95)), url("assets/themes/ender/crying-obsidian.png"); background-size: auto, 42px 42px; box-shadow: var(--shadow); }
+html[data-theme="ender-observatory"] .dash-title svg,
+html[data-theme="ender-observatory"] .refresh-btn svg { color: #c3f279; }
+html[data-theme="ender-observatory"] .dash-title { color: #faf6ff; font-weight: 800; }
+html[data-theme="ender-observatory"] .account-pill { border-color: #746585; background: #211a2a; color: #e1d5ef; }
+html[data-theme="ender-observatory"] .hero-card,
+html[data-theme="ender-observatory"] .metric,
+html[data-theme="ender-observatory"] .runs-chart,
+html[data-theme="ender-observatory"] .dash-table { border-color: #4f455c; background: #1b1722; }
+html[data-theme="ender-observatory"] .hero-primary { border-color: #93b65e; background: linear-gradient(145deg, #293824, #1a1d1b); }
+html[data-theme="ender-observatory"] .hero-primary .hero-value,
+html[data-theme="ender-observatory"] .dash-section-title,
+html[data-theme="ender-observatory"] .dash-table th { color: #c3f279; }
+html[data-theme="ender-observatory"] .refresh-btn { border-color: #746585; background: #2d2440; color: #eee6fa; }
+html[data-theme="ender-observatory"] .refresh-btn:hover:not(:disabled) { border-color: #c3f279; }
+html[data-theme="ender-observatory"] .bar-stack { background: #100e15; }
+html[data-theme="ender-observatory"] .bar-pc { background: #c3f279; }
+html[data-theme="ender-observatory"] .bar-mobile { background: #bda2e8; }
+html[data-theme="ender-observatory"] .bar-daily { background: #f1c766; }
+html[data-theme="ender-observatory"] .dash-table th,
+html[data-theme="ender-observatory"] .dash-table td { border-color: #4f455c; }
+
+html[data-theme="overworld-workshop"] .dash-header,
+html[data-theme="nether-relay"] .dash-header { padding: 11px 13px; border: 1px solid var(--line-strong); background-color: var(--surface); background-image: linear-gradient(rgba(0, 0, 0, .14), rgba(0, 0, 0, .14)), var(--theme-header-texture); background-size: auto, 42px 42px; box-shadow: var(--shadow); }
+html[data-theme="overworld-workshop"] .hero-card,
+html[data-theme="nether-relay"] .hero-card,
+html[data-theme="overworld-workshop"] .metric,
+html[data-theme="nether-relay"] .metric,
+html[data-theme="overworld-workshop"] .runs-chart,
+html[data-theme="nether-relay"] .runs-chart,
+html[data-theme="overworld-workshop"] .dash-table,
+html[data-theme="nether-relay"] .dash-table { border-color: var(--line); background: var(--surface); }
+html[data-theme="overworld-workshop"] .hero-primary,
+html[data-theme="nether-relay"] .hero-primary { border-color: var(--theme-accent); background: var(--surface-soft); }
+html[data-theme="overworld-workshop"] .hero-primary .hero-value,
+html[data-theme="nether-relay"] .hero-primary .hero-value,
+html[data-theme="overworld-workshop"] .dash-section-title,
+html[data-theme="nether-relay"] .dash-section-title,
+html[data-theme="overworld-workshop"] .dash-table th,
+html[data-theme="nether-relay"] .dash-table th { color: var(--theme-primary); }
+html[data-theme="overworld-workshop"] .bar-pc,
+html[data-theme="nether-relay"] .bar-pc { background: var(--theme-primary); }
+html[data-theme="overworld-workshop"] .bar-mobile,
+html[data-theme="nether-relay"] .bar-mobile { background: var(--theme-secondary); }
