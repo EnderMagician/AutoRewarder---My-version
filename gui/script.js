@@ -41,19 +41,32 @@ function show_toast(message, type, opts) {
   toast.innerHTML =
     TOAST_ICONS[kind] +
     '<div class="toast-msg"></div>' +
-    '<button class="toast-close" aria-label="Dismiss">&times;</button>';
+    '<button class="toast-close" type="button" aria-label="Dismiss">&times;</button>';
 
   toast.querySelector('.toast-msg').textContent = message;
 
+  let dismissTimer = null;
+  let removalTimer = null;
+  const remove = () => {
+    if (removalTimer !== null) window.clearTimeout(removalTimer);
+    toast.remove();
+  };
   const dismiss = () => {
+    if (!toast.isConnected || toast.classList.contains('hiding')) return;
+    if (dismissTimer !== null) window.clearTimeout(dismissTimer);
     toast.classList.add('hiding');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    toast.addEventListener('animationend', remove, { once: true });
+    // Remove even when animations are disabled or interrupted.
+    removalTimer = window.setTimeout(remove, 220);
   };
 
-  toast.querySelector('.toast-close').addEventListener('click', dismiss);
+  toast.querySelector('.toast-close').addEventListener('click', (event) => {
+    event.preventDefault();
+    dismiss();
+  });
   container.appendChild(toast);
 
-  if (duration > 0) setTimeout(dismiss, duration);
+  if (duration > 0) dismissTimer = window.setTimeout(dismiss, duration);
 }
 
 // =========================================================================
@@ -526,11 +539,20 @@ async function start_all_accounts() {
 
     const count = (result.completed_account_ids || []).length;
     const skipped = (result.skipped_account_ids || []).length;
+    const dailyTaskFailureAccounts = result.daily_task_failure_accounts || [];
     if (result.status === 'completed') {
-      show_toast(
-        `Batch completed: ${count} account${count === 1 ? '' : 's'} run, ${skipped} skipped.`,
-        'success'
-      );
+      if (dailyTaskFailureAccounts.length) {
+        const labels = dailyTaskFailureAccounts.map((account) => account.label).join(', ');
+        show_toast(
+          `Batch completed: ${count} account${count === 1 ? '' : 's'} run, ${skipped} skipped. Daily Tasks need attention for: ${labels}.`,
+          'warning'
+        );
+      } else {
+        show_toast(
+          `Batch completed: ${count} account${count === 1 ? '' : 's'} run, ${skipped} skipped.`,
+          'success'
+        );
+      }
     } else if (result.status === 'stopped') {
       show_toast('Batch stopped. Completed accounts will be skipped on retry.', 'warning');
     } else if (result.status === 'busy') {

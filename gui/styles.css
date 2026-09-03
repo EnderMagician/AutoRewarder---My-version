@@ -667,10 +667,15 @@ select:focus { border-color: var(--blue); outline: none; box-shadow: var(--focus
 .toast.success { border-color: var(--green); }
 .toast.warning { border-color: var(--amber); }
 .toast.error { border-color: var(--red); }
+.toast.hiding { pointer-events: none; animation: toast-dismiss 180ms ease forwards; }
 .toast-icon { width: 16px; height: 16px; flex: 0 0 16px; }
 .toast-msg { min-width: 0; flex: 1; }
-.toast-close { padding: 0 2px; border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; }
+.toast-close { padding: 0 2px; border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
 .toast-close:hover { color: var(--text); }
+
+@keyframes toast-dismiss {
+  to { opacity: 0; transform: translateX(12px); }
+}
 
 .loader-line { display: flex; align-items: center; gap: 8px; padding: 7px 0; color: #a9c9ef; }
 .spinner { width: 11px; height: 11px; border: 2px solid rgba(169, 201, 239, 0.35); border-top-color: #a9c9ef; border-radius: 50%; animation: spin 750ms linear infinite; }

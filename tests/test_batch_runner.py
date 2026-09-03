@@ -180,6 +180,58 @@ class BatchRunnerTests(unittest.TestCase):
         )
         self.assertEqual("original", api.account_manager.current_id())
 
+    def test_batch_continues_after_daily_task_only_failure_and_reports_it(self):
+        api = self._api(
+            {
+                "ready-a": {
+                    "completed": False,
+                    "stopped": False,
+                    "error": "daily_tasks_failed",
+                    "pc_completed": 11,
+                    "mobile_completed": 4,
+                },
+                "ready-b": {
+                    "completed": True,
+                    "stopped": False,
+                    "error": None,
+                },
+            }
+        )
+
+        result = api.run_all_accounts(include_daily_tasks=True)
+
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(["ready-a", "ready-b"], result["completed_account_ids"])
+        self.assertEqual(["ready-a", "ready-b"], api.marked)
+        self.assertEqual(
+            [{"id": "ready-a", "label": "Ready A"}],
+            result["daily_task_failure_accounts"],
+        )
+
+    def test_batch_stops_when_daily_task_failure_leaves_searches_incomplete(self):
+        api = self._api(
+            {
+                "ready-a": {
+                    "completed": False,
+                    "stopped": False,
+                    "error": "daily_tasks_failed",
+                    "pc_completed": 11,
+                    "mobile_completed": 0,
+                },
+                "ready-b": {
+                    "completed": True,
+                    "stopped": False,
+                    "error": None,
+                },
+            }
+        )
+
+        result = api.run_all_accounts(include_daily_tasks=True)
+
+        self.assertEqual("failed", result["status"])
+        self.assertEqual("ready-a", result["failed_account_id"])
+        self.assertEqual([], api.marked)
+
     def test_batch_requests_an_existing_scheduled_run_to_stop_before_acquiring_lock(
         self,
     ):
@@ -207,7 +259,7 @@ class SingleAccountRunTests(unittest.TestCase):
         api._session_counts = {"pc": 0, "mobile": 0, "cards": 0, "earn": 0, "quests": 0}
         api._last_scraped_balance = None
         api.log = lambda _message: None
-        api._record_session_stats = lambda: None
+        api._record_session_stats = lambda *_args, **_kwargs: None
         api._get_account_schedule = lambda _account_id: {
             "enabled": False,
             "advancedScheduling": False,
@@ -235,6 +287,29 @@ class SingleAccountRunTests(unittest.TestCase):
         result = api._run_current_account(11, 4, include_daily_tasks=True)
 
         self.assertTrue(result["completed"])
+        self.assertEqual([(False, 11, True), (True, 4, False)], phases)
+
+    def test_single_account_finishes_mobile_searches_after_daily_task_failure(self):
+        api = self._api()
+        phases = []
+
+        def run_phase(mobile, count, do_daily_set):
+            phases.append((mobile, count, do_daily_set))
+            return {
+                "expected": count,
+                "completed": count,
+                "daily_success": False if do_daily_set else None,
+                "error": "daily_tasks_failed" if do_daily_set else None,
+            }
+
+        api._run_phase = run_phase
+
+        result = api._run_current_account(11, 4, include_daily_tasks=True)
+
+        self.assertFalse(result["completed"])
+        self.assertEqual("daily_tasks_failed", result["error"])
+        self.assertEqual(11, result["pc_completed"])
+        self.assertEqual(4, result["mobile_completed"])
         self.assertEqual([(False, 11, True), (True, 4, False)], phases)
 
     def test_single_account_returns_the_existing_advanced_schedule_outcome(self):

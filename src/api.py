@@ -66,6 +66,7 @@ _SYSTEMD_UNIT_NAME = "autorewarder"
 
 # HH:MM validator — accepts 00:00..23:59.
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_DAILY_TASK_FAILURE_ERRORS = {"daily_tasks_failed", "daily_tasks_unavailable"}
 
 
 def _normalize_run_time(value):
@@ -680,6 +681,7 @@ class AutoRewarderAPI:
         original_account_id = self.account_manager.current_id()
         completed = []
         skipped = []
+        daily_task_failure_accounts = []
         try:
             active = self.run_coordinator.active_run()
             if active is not None:
@@ -754,10 +756,27 @@ class AutoRewarderAPI:
                     mobile_count,
                     include_daily_tasks=bool(include_daily_tasks),
                 )
-                if outcome.get("completed"):
+                daily_task_only_failure = (
+                    bool(include_daily_tasks)
+                    and not outcome.get("stopped")
+                    and not self._stop_event.is_set()
+                    and outcome.get("error") in _DAILY_TASK_FAILURE_ERRORS
+                    and outcome.get("pc_completed") == pc_count
+                    and outcome.get("mobile_completed") == mobile_count
+                )
+                if outcome.get("completed") or daily_task_only_failure:
                     self._mark_account_completed_today(account_id)
                     completed.append(account_id)
-                    self.log(f"Completed '{account['label']}'.")
+                    if daily_task_only_failure:
+                        daily_task_failure_accounts.append(
+                            {"id": account_id, "label": account["label"]}
+                        )
+                        self.log(
+                            f"[WARNING] Daily Tasks failed for '{account['label']}', "
+                            "but all searches completed. Continuing the batch."
+                        )
+                    else:
+                        self.log(f"Completed '{account['label']}'.")
                     continue
 
                 stopped = bool(outcome.get("stopped") or self._stop_event.is_set())
@@ -775,13 +794,23 @@ class AutoRewarderAPI:
                     "skipped_account_ids": skipped,
                     "failed_account_id": account_id,
                     "error": outcome.get("error"),
+                    "daily_task_failure_accounts": daily_task_failure_accounts,
                 }
 
+            if daily_task_failure_accounts:
+                labels = ", ".join(
+                    account["label"] for account in daily_task_failure_accounts
+                )
+                self.log(
+                    "[WARNING] Batch completed with Daily Tasks needing attention for: "
+                    f"{labels}."
+                )
             return {
                 "status": "completed",
                 "completed_account_ids": completed,
                 "skipped_account_ids": skipped,
                 "failed_account_id": None,
+                "daily_task_failure_accounts": daily_task_failure_accounts,
             }
         finally:
             if original_account_id is not None:
@@ -2415,7 +2444,13 @@ class AutoRewarderAPI:
                 if phase["daily_success"] is not None:
                     ran_daily_set = True
                     outcome["daily_success"] = phase["daily_success"]
-                if phase["error"] or phase["completed"] != batch_pc:
+                daily_task_only_failure = (
+                    phase["error"] in _DAILY_TASK_FAILURE_ERRORS
+                    and phase["completed"] == batch_pc
+                )
+                if daily_task_only_failure:
+                    outcome["error"] = phase["error"]
+                elif phase["error"] or phase["completed"] != batch_pc:
                     outcome["error"] = phase["error"] or "pc_search_incomplete"
                     outcome["stopped"] = self._stop_event.is_set()
                     return outcome
@@ -2452,7 +2487,7 @@ class AutoRewarderAPI:
             outcome["error"] = "schedule_incomplete"
             return outcome
         if include_daily_tasks and pc > 0 and outcome["daily_success"] is False:
-            outcome["error"] = "daily_tasks_failed"
+            outcome["error"] = outcome["error"] or "daily_tasks_failed"
             return outcome
         outcome["completed"] = True
         self.log("Advanced schedule completed!")
@@ -2497,7 +2532,13 @@ class AutoRewarderAPI:
                     )
                     outcome["pc_completed"] = phase["completed"]
                     outcome["daily_success"] = phase["daily_success"]
-                    if phase["error"] or phase["completed"] != pc:
+                    daily_task_only_failure = (
+                        phase["error"] in _DAILY_TASK_FAILURE_ERRORS
+                        and phase["completed"] == pc
+                    )
+                    if daily_task_only_failure:
+                        outcome["error"] = phase["error"]
+                    elif phase["error"] or phase["completed"] != pc:
                         outcome["error"] = phase["error"] or "pc_search_incomplete"
                         outcome["stopped"] = self._stop_event.is_set()
                         return outcome
@@ -2519,7 +2560,7 @@ class AutoRewarderAPI:
                     outcome["stopped"] = True
                     return outcome
                 if include_daily_tasks and pc > 0 and outcome["daily_success"] is False:
-                    outcome["error"] = "daily_tasks_failed"
+                    outcome["error"] = outcome["error"] or "daily_tasks_failed"
                     return outcome
                 outcome["completed"] = True
                 return outcome
