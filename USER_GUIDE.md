@@ -9,14 +9,33 @@ Welcome! This guide will help you get started with AutoRewarder and explain all 
 
 ## Table of Contents
 
-1. [Installation](#installation)
-2. [First Run & Setup](#first-run--setup)
-3. [How to Use](#how-to-use)
-4. [Understanding the Settings](#understanding-the-settings)
-5. [Viewing Search History](#viewing-search-history)
-6. [Tips & Best Practices](#tips--best-practices)
-7. [Troubleshooting](#troubleshooting)
-8. [FAQ](#faq)
+### Getting Started
+- [Installation](#installation)
+- [First Run & Setup](#first-run--setup)
+
+### Using AutoRewarder
+- [Starting a Session](#starting-a-session)
+- [Daily tasks only](#daily-tasks-only)
+- [Visual Search](#visual-search)
+- [What's Happening?](#whats-happening)
+
+### Settings & Automation
+- [Understanding the Settings](#understanding-the-settings)
+- [Rewards Dashboard](#rewards-dashboard)
+- [Hide Browser](#hide-browser)
+- [Autostart & Daily Run Time](#autostart--daily-run-time)
+- [AI-generated search terms (LLM)](#ai-generated-search-terms-llm)
+- [Scheduled runs](#scheduled-runs)
+- [System Tray & Application Exit](#system-tray--application-exit)
+
+### Activity
+- [Viewing Search History](#viewing-search-history)
+- [View background process logs](#view-background-process-logs)
+- [Tips & Best Practices](#tips--best-practices)
+
+### Troubleshooting & Support
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
 
 ---
 
@@ -123,6 +142,7 @@ Adding another account is slightly different, so please follow these steps:
 - It may take short "coffee breaks" during longer sessions
 - If Schedule is enabled and Advanced scheduling is on, the run is paced across the schedule duration using the queries-per-hour target. You will see a clear "Done!" message in the logs when the advanced scheduling run fully completes.
 - After the PC phase, it collects Daily Set + "More Activities" click-through tasks (once per day, per account). Locked cards, sweepstakes and promo banners are automatically skipped — only point-earning tasks are clicked
+- If the Visual Search task isn't completed, it will be completed as part of the daily task flow or after PC phase.
 - The process continues until all searches are complete, or until you click **Stop**
 - You'll see updates in the log window
 
@@ -130,7 +150,19 @@ If a new version is available, AutoRewarder can show an update notification and 
 
 ### Daily tasks only
 
-If you've already done your searches manually (or just want to clean up the dashboard quickly), enable the **"Daily tasks only"** toggle before starting. The run skips both Bing search phases and goes straight to the Rewards dashboard to harvest the Daily Set + More Activities cards.
+If you've already done your searches manually (or just want to clean up the dashboard quickly), enable the **"Daily tasks only"** toggle before starting. The run skips both Bing search phases and goes straight to the Rewards dashboard to harvest the Daily Set/More Activities cards + Visual Search task.
+
+### Visual Search
+
+This feature uses a rotating pool of base images, random cropping, and varied JPEG compression to create a large number of distinct upload variants, which helps the bot behave more like a real user while reducing the chance of hash-based detection.
+
+The visual-search flow is designed to:
+- run as part of the daily task cycle or after the PC phase, if the task is not already completed
+- produce 54,684 unique variations per image, generating over 1.6 million different upload variants to keep your account safe
+- keep the process human-like with natural mouse movement, randomized delays, and natural page scrolling after upload
+
+> [!NOTE]
+> The app tracks visual-search completion per day and per account, so the task does not get repeated.
 
 ### After Completion
 
@@ -286,6 +318,8 @@ C:\Users\[YourUsername]\AppData\Local\AutoRewarder\background_log.txt
 - Don't force-close the app while a session is running
 - Don't modify files in `AppData\Local\AutoRewarder` manually
 - Don't run multiple AutoRewarder instances simultaneously
+- Don't run multiple accounts at the same time
+- Don't run multiple accounts from the same IP address
 
 ### Recommended Usage
 
@@ -367,8 +401,8 @@ A: Currently, the pre-built installer and standalone executable are only availab
 
 ---
 
-**Last Updated**: July 2026
+**Last Updated**: August 2026
 
-**Version**: 4.1
+**Version**: 4.2
 
 Enjoy using AutoRewarder! 🎉
