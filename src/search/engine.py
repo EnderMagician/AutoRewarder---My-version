@@ -449,6 +449,7 @@ class SearchEngine:
         time.sleep(random.uniform(1, 4))
 
         # Send the file path to the hidden type="file" input element
+        known_tabs = self._tab_snapshot(driver)
         upload_input.send_keys(image_path)
 
         if self._wait_for_visual_search_results(
@@ -457,6 +458,7 @@ class SearchEngine:
             timeout=45,
             poll_interval=poll_interval,
             stop_event=stop_event,
+            known_tabs=known_tabs,
         ):
             return "done"
 
@@ -525,8 +527,38 @@ class SearchEngine:
 
         return False
 
+    def _tab_snapshot(self, driver):
+        """Map each open tab to its current URL, to spot which one moves."""
+        snapshot = {}
+
+        try:
+            origin = driver.current_window_handle
+            handles = driver.window_handles
+        except WebDriverException:
+            return snapshot
+
+        for handle in handles:
+            try:
+                driver.switch_to.window(handle)
+                snapshot[handle] = self._current_url(driver)
+            except WebDriverException:
+                continue
+
+        try:
+            driver.switch_to.window(origin)
+        except WebDriverException:
+            pass
+
+        return snapshot
+
     def _wait_for_visual_search_results(
-        self, driver, start_url, timeout, poll_interval, stop_event=None
+        self,
+        driver,
+        start_url,
+        timeout,
+        poll_interval,
+        stop_event=None,
+        known_tabs=None,
     ):
         """
         Wait until the uploaded image actually lands on a visual search result page.
@@ -542,6 +574,11 @@ class SearchEngine:
             poll_interval (float): Delay between two polling rounds, in seconds.
             stop_event (threading.Event, optional): When set, polling gives up at
                 once instead of running to the timeout.
+            known_tabs (dict, optional): Tab -> URL before the upload. A tab that
+                was already open and hasn't moved since is not our result, even
+                when its URL looks like one (a daily-set activity can leave an
+                image page open); without this the search would report a success
+                it didn't make, and skip the retry that would have made it.
 
         Returns:
             bool: True if the results page was reached, False if the timeout
@@ -576,7 +613,10 @@ class SearchEngine:
                     driver.switch_to.window(handle)
                 except WebDriverException:
                     continue
-                if self._is_results_url(self._current_url(driver), start_url):
+                url = self._current_url(driver)
+                if known_tabs and url == known_tabs.get(handle):
+                    continue
+                if self._is_results_url(url, start_url):
                     self._log("Visual search results opened in a new tab.")
                     return True
 
