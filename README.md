@@ -224,12 +224,17 @@ python AutoRewarder.py --headless --account "Main" --pc 30 --force
 .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean AutoRewarder.spec
 ```
 
+**Build Portable EXE (Standalone Onefile):**
+```bash
+.\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean AutoRewarder_Portable.spec
+```
+
 **Create Windows Installer:**
 ```bash
 "C:\Program Files (x86)\Inno Setup 6\iscc.exe" AutoRewarder.iss
 ```
 Or use the Inno Setup IDE to open `AutoRewarder.iss` and compile it.
-Output: `dist/AutoRewarder-Setup.exe`
+Output: `dist/AutoRewarder-Setup.exe` (Installer) and `dist/AutoRewarder.exe` (Portable)
 
 ---
 
