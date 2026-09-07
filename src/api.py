@@ -734,7 +734,11 @@ class AutoRewarderAPI:
         account's meta.json, so we just drop the global one. Anything
         valuable was already migrated during a previous upgrade cycle.
         """
-        settings = self.global_settings.get_settings()
+        try:
+            settings = self.global_settings.settings_for_update()
+        except OSError as e:
+            self._safe_log(f"[WARNING] Could not read settings.json: {e}")
+            return
         if "schedule" in settings:
             settings.pop("schedule", None)
             self.global_settings.save_settings(settings)
@@ -855,7 +859,7 @@ class AutoRewarderAPI:
 
         # Mark current schema applied so we don't re-run unnecessarily.
         try:
-            settings = self.global_settings.get_settings()
+            settings = self.global_settings.settings_for_update()
             settings["autostart_schema_version"] = self._AUTOSTART_SCHEMA_VERSION
             self.global_settings.save_settings(settings)
         except Exception:
@@ -1361,7 +1365,11 @@ class AutoRewarderAPI:
 
         # Persist user intent FIRST so _sync_account_autostart reads the
         # new value when it queries is_autostart_enabled().
-        settings = self.global_settings.get_settings()
+        try:
+            settings = self.global_settings.settings_for_update()
+        except OSError as e:
+            self.log(f"[ERROR] Could not save the autostart setting: {e}")
+            return False
         settings["autoStartUp"] = bool(enable)
         self.global_settings.save_settings(settings)
 
@@ -1412,9 +1420,12 @@ class AutoRewarderAPI:
         ok = self._set_autostart_registry(bool(enabled))
         if ok:
             # Mirror the state into global settings.json for the UI.
-            settings = self.global_settings.get_settings()
-            settings["autoStartUp"] = bool(enabled)
-            self.global_settings.save_settings(settings)
+            try:
+                settings = self.global_settings.settings_for_update()
+                settings["autoStartUp"] = bool(enabled)
+                self.global_settings.save_settings(settings)
+            except OSError as e:
+                self._safe_log(f"[WARNING] Could not mirror autostart state: {e}")
         return ok
 
     # ------------------------------------------------------------------
