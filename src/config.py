@@ -11,7 +11,7 @@ import platform
 import sys
 
 CURRENT_VERSION = "v4.3"
-REPO = "safarsin/AutoRewarder"
+REPO = "EnderMagician/AutoRewarder---My-version"
 
 PLATFORM_NAME = platform.system()
 
