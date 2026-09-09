@@ -17,7 +17,7 @@
         <img class="brand-mark" src="assets/chibi-avatar.png" alt="AutoRewarder mascot" width="62" height="62">
         <div class="brand-text">
           <h1>AutoRewarder</h1>
-          <span class="brand-sub">Microsoft Rewards · v4.2.6</span>
+          <span class="brand-sub">Microsoft Rewards · v4.2.6 Hotfix 1</span>
         </div>
       </div>
 
@@ -72,10 +72,11 @@
             <span class="run-icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20"></polygon></svg></span>
             <span class="run-copy"><span class="btn-label">Start run</span><span>for selected account</span></span>
           </button>
-          <label class="run-mode-option toggle-row" title="Skip searches; only complete the daily Rewards tasks">
+          <label class="run-mode-option toggle-row daily-toggle" title="Skip searches; only complete the daily Rewards tasks">
             <span class="option-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M7 12h10M9 16h2M14 16h1"></path></svg></span>
             <span class="toggle-copy"><span>Daily tasks only</span><small>Skip PC and Mobile searches</small></span>
             <input type="checkbox" id="dailyOnlyToggle">
+            <span class="toggle-pill" aria-hidden="true"></span>
           </label>
         </article>
 
@@ -85,10 +86,11 @@
             <span class="run-copy"><span class="batch-btn-label">Run all accounts</span><span class="batch-account-status"><i></i><span id="batch_account_name">Ready to start</span></span></span>
           </button>
           <div class="batch-progress" id="batch_progress" hidden aria-live="polite"><span id="batch_progress_text"></span></div>
-          <label class="run-mode-option toggle-row" title="Only applies to Run all accounts; searches always use each account's saved schedule">
+          <label class="run-mode-option toggle-row daily-toggle" title="Only applies to Run all accounts; searches always use each account's saved schedule">
             <span class="option-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M7 12h10M9 16h2M14 16h1"></path></svg></span>
             <span class="toggle-copy"><span>Include Daily tasks</span><small>Run Daily Set and earn tasks</small></span>
             <input type="checkbox" id="batchDailyTasksToggle">
+            <span class="toggle-pill" aria-hidden="true"></span>
           </label>
         </article>
       </div>

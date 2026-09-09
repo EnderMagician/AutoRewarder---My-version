@@ -390,6 +390,27 @@ input[type="checkbox"]:checked + .toggle-pill { border-color: var(--green); back
 input[type="checkbox"]:checked + .toggle-pill::after { transform: translateX(14px); }
 input[type="checkbox"]:focus-visible + .toggle-pill { box-shadow: var(--focus); }
 
+/* Mirror the landing light switch: Daily-task switches glow while enabled. */
+.daily-toggle input[type="checkbox"]:checked + .toggle-pill {
+  border-color: var(--amber);
+  background: var(--amber);
+  box-shadow: 0 0 13px rgba(246, 196, 83, 0.72);
+  animation: daily-toggle-pulse 1.6s ease-in-out infinite;
+}
+
+.daily-toggle input[type="checkbox"]:checked + .toggle-pill::after {
+  background: #fff3c4;
+}
+
+@keyframes daily-toggle-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(246, 196, 83, 0.42); }
+  50% { box-shadow: 0 0 18px rgba(246, 196, 83, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-toggle input[type="checkbox"]:checked + .toggle-pill { animation: none; }
+}
+
 /* Ender-eye browser visibility control: the only browser state control on
    the main surface. It swaps two pixel-inspired SVG layers rather than using
    a slider, with a still fallback for reduced-motion users. */
