@@ -51,7 +51,9 @@ function render_accounts_section(accounts) {
     renameBtn.title = 'Rename';
     renameBtn.setAttribute('aria-label', 'Rename');
     renameBtn.innerHTML = ACCOUNT_ICONS.rename;
+    renameBtn.disabled = batchRunning;
     renameBtn.addEventListener('click', async () => {
+      if (batchRunning) return;
       const newLabel = await prompt_modal(
         'Rename account',
         `Enter a new name for "${acc.label}".`,
@@ -72,7 +74,9 @@ function render_accounts_section(accounts) {
     resetupBtn.title = acc.first_setup_done ? 'Re-run setup' : 'Run setup';
     resetupBtn.setAttribute('aria-label', resetupBtn.title);
     resetupBtn.innerHTML = ACCOUNT_ICONS.setup;
+    resetupBtn.disabled = batchRunning;
     resetupBtn.addEventListener('click', () => {
+      if (batchRunning) return;
       show_toast(`Opening browser to set up "${acc.label}"…`, 'info', { duration: 6000 });
       pywebview.api.rerun_setup(acc.id).then(ok => {
         if (!ok) show_toast('Setup could not be started.', 'error');
@@ -84,7 +88,9 @@ function render_accounts_section(accounts) {
     deleteBtn.title = 'Delete';
     deleteBtn.setAttribute('aria-label', 'Delete');
     deleteBtn.innerHTML = ACCOUNT_ICONS.trash;
+    deleteBtn.disabled = batchRunning;
     deleteBtn.addEventListener('click', async () => {
+      if (batchRunning) return;
       const confirmed = await confirm_modal(
         `Delete "${acc.label}"?`,
         'This removes its browser profile, history, and daily-set status. This cannot be undone.',
@@ -108,5 +114,10 @@ function render_accounts_section(accounts) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const addBtn = document.getElementById('addAccountBtn');
-  if (addBtn) addBtn.addEventListener('click', prompt_and_create_account);
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      if (batchRunning) return;
+      prompt_and_create_account();
+    });
+  }
 });

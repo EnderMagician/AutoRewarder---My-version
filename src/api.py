@@ -44,6 +44,12 @@ from .stats import (
     POINTS_PER_SEARCH,
     POINTS_PER_CARD,
 )
+from .run_coordinator import (
+    RUN_ORIGIN_BATCH,
+    RUN_ORIGIN_INTERACTIVE,
+    RUN_ORIGIN_SCHEDULED,
+    RunCoordinator,
+)
 
 # Default wall-clock fire time (24h "HH:MM") if an account schedule does
 # not yet have a `run_time` value. Each account stores its own time in
@@ -60,6 +66,7 @@ _SYSTEMD_UNIT_NAME = "autorewarder"
 
 # HH:MM validator — accepts 00:00..23:59.
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_DAILY_TASK_FAILURE_ERRORS = {"daily_tasks_failed", "daily_tasks_unavailable"}
 
 
 def _normalize_run_time(value):
@@ -96,6 +103,8 @@ class AutoRewarderAPI:
         # Set when the user clicks Stop. Long loops in search_engine and
         # daily_set poll this between iterations and bail out cleanly.
         self._stop_event = threading.Event()
+        self.run_coordinator = RunCoordinator()
+        self.run_origin = RUN_ORIGIN_INTERACTIVE
 
         # Global (app-wide) settings. Per-account data is handled below.
         self.global_settings = GlobalSettingsManager()
@@ -127,11 +136,6 @@ class AutoRewarderAPI:
             "quests": 0,
         }
         self._last_scraped_balance = None
-        # Whether the Daily Set / visual search already ran in this main() call.
-        # A "Force …" setting is persistent, so without these the PC batches of
-        # an advanced schedule would each redo the task (and re-upload an image).
-        self._daily_set_attempted = False
-        self._visual_search_attempted = False
         # Last balance-scrape diagnostic ({value, via, candidates, url, title}),
         # surfaced to the dashboard so a failed read can be debugged in place.
         self._last_balance_debug = {}
@@ -251,7 +255,7 @@ class AutoRewarderAPI:
             width=700,
             height=500,
             resizable=True,
-            background_color="#0d1117",
+            background_color="#0e0b14",
             text_select=True,
         )
 
@@ -277,7 +281,7 @@ class AutoRewarderAPI:
             "width": 760,
             "height": 620,
             "resizable": True,
-            "background_color": "#0b0d12",
+            "background_color": "#0e0b14",
             "text_select": True,
         }
 
@@ -454,26 +458,21 @@ class AutoRewarderAPI:
         state = "ON (X → tray)" if value else "OFF (X → quit)"
         self.log(f"Close-to-tray: {state}. Restart to apply.")
 
+    def set_ui_theme(self, theme):
+        """Persist the selected app theme for the main and secondary windows."""
+        selected = self.global_settings.set_ui_theme(theme)
+        self.log(f"UI theme selected: {selected}.")
+        return selected
+
     def get_force_tasks(self):
-        """Return the force flags for the daily tasks and the visual search."""
+        """Return the force flags for daily tasks and visual search."""
         return self.global_settings.get_force_tasks()
 
     def set_force_tasks(self, force_daily_tasks, force_visual_search):
-        """
-        Persist the "run even if already done today" toggles.
-
-        Args:
-            force_daily_tasks (bool): Run the Daily Set even when status.json
-                says it is already done today.
-            force_visual_search (bool): Run the visual search even when
-                status.json says it is already done today.
-
-        Returns:
-            bool: True once the flags are saved.
-        """
+        """Persist task rerun preferences selected in the settings UI."""
         self.global_settings.set_force_tasks(force_daily_tasks, force_visual_search)
         self.log(
-            f"Force daily tasks: {'ON' if force_daily_tasks else 'OFF'} — "
+            f"Force daily tasks: {'ON' if force_daily_tasks else 'OFF'} - "
             f"Force visual search: {'ON' if force_visual_search else 'OFF'}"
         )
         return True
@@ -520,6 +519,23 @@ class AutoRewarderAPI:
             return True
         except Exception as e:
             self.log(f"[WARNING] Failed to save search counts: {e}")
+            return False
+
+    def get_batch_include_daily_tasks(self):
+        """Return the saved Daily tasks choice for a multi-account batch."""
+        return bool(
+            self.global_settings.get_settings().get("batch_include_daily_tasks", False)
+        )
+
+    def set_batch_include_daily_tasks(self, include_daily_tasks):
+        """Persist the Daily tasks choice used by the next account batch."""
+        try:
+            settings = self.global_settings.get_settings()
+            settings["batch_include_daily_tasks"] = bool(include_daily_tasks)
+            self.global_settings.save_settings(settings)
+            return True
+        except Exception as e:
+            self.log(f"[WARNING] Failed to save batch Daily tasks setting: {e}")
             return False
 
     # ------------------------------------------------------------------
@@ -601,6 +617,230 @@ class AutoRewarderAPI:
         except Exception:
             pass
         return True
+
+    def _get_account_schedule(self, account_id):
+        """Return the merged schedule for one account."""
+        return AccountMetaManager(account_id).get_schedule()
+
+    def _get_batch_query_counts(self, schedule):
+        """Return usable search counts for a batch account.
+
+        Older account metadata can contain ``0/0`` after the schedule editor
+        was saved while the schedule was disabled.  That should not abort a
+        manual batch; use the current global counts as the compatibility
+        fallback while preserving any non-zero per-account value.
+        """
+        try:
+            pc = max(0, min(130, int(schedule.get("queries_pc", 0))))
+        except (AttributeError, TypeError, ValueError):
+            pc = 0
+        try:
+            mobile = max(0, min(99, int(schedule.get("queries_mobile", 0))))
+        except (AttributeError, TypeError, ValueError):
+            mobile = 0
+
+        if pc == 0 and mobile == 0:
+            pc = self.global_settings.get_queries_pc()
+            mobile = self.global_settings.get_queries_mobile()
+            self.log(
+                "[WARNING] Account schedule has no search counts; "
+                f"using global defaults PC={pc}, Mobile={mobile}."
+            )
+        return pc, mobile
+
+    def _is_account_completed_today(self, account_id):
+        """Return whether an account has a successful run recorded today."""
+        from datetime import date
+
+        return (
+            self._get_account_schedule(account_id).get("last_triggered_date")
+            == date.today().isoformat()
+        )
+
+    def _mark_account_completed_today(self, account_id):
+        """Persist a successful account run as complete for the current day."""
+        from datetime import date
+
+        meta = AccountMetaManager(account_id)
+        schedule = meta.get_schedule()
+        schedule["last_triggered_date"] = date.today().isoformat()
+        meta.set_schedule(schedule)
+
+    def _notify_batch_ui(self, state, account=None, completed=0, total=0, skipped=0):
+        """Update batch-specific GUI state when a webview is attached."""
+        if not self._webview_window:
+            return
+        try:
+            self._webview_window.evaluate_js(
+                "typeof update_batch_run_ui === 'function' && update_batch_run_ui("
+                f"{json.dumps(state)}, {json.dumps(account)}, {int(completed)}, "
+                f"{int(total)}, {int(skipped)})"
+            )
+        except Exception:
+            pass
+
+    def _select_account_for_batch(self, account_id):
+        """Switch backend context and refresh the GUI for a batch account."""
+        self.account_manager.select(account_id)
+        self._rebuild_account_context()
+        self._broadcast_account_ui()
+
+    def run_all_accounts(self, include_daily_tasks=False):
+        """Run every ready account sequentially, resuming completed accounts by date."""
+        if not self._run_lock.acquire(blocking=False):
+            self._notify_batch_ui("idle")
+            return {
+                "status": "busy",
+                "completed_account_ids": [],
+                "skipped_account_ids": [],
+                "failed_account_id": None,
+            }
+
+        lease = None
+        original_account_id = self.account_manager.current_id()
+        completed = []
+        skipped = []
+        daily_task_failure_accounts = []
+        try:
+            active = self.run_coordinator.active_run()
+            if active is not None:
+                if active.get("origin") != RUN_ORIGIN_SCHEDULED:
+                    return {
+                        "status": "busy",
+                        "completed_account_ids": completed,
+                        "skipped_account_ids": skipped,
+                        "failed_account_id": None,
+                    }
+                self.log("Stopping scheduled run before starting account batch…")
+                if not self.run_coordinator.request_stop_for_scheduled():
+                    return {
+                        "status": "busy",
+                        "completed_account_ids": completed,
+                        "skipped_account_ids": skipped,
+                        "failed_account_id": None,
+                    }
+                if not self.run_coordinator.wait_for_release(timeout=60):
+                    return {
+                        "status": "busy",
+                        "completed_account_ids": completed,
+                        "skipped_account_ids": skipped,
+                        "failed_account_id": None,
+                    }
+
+            lease = self.run_coordinator.acquire(RUN_ORIGIN_BATCH)
+            if lease is None:
+                return {
+                    "status": "busy",
+                    "completed_account_ids": completed,
+                    "skipped_account_ids": skipped,
+                    "failed_account_id": None,
+                }
+
+            self._stop_event.clear()
+            ready_accounts = [
+                account
+                for account in self.account_manager.list()
+                if account.get("id") and account.get("first_setup_done")
+            ]
+            runnable_accounts = []
+            for account in ready_accounts:
+                account_id = account["id"]
+                if self._is_account_completed_today(account_id):
+                    skipped.append(account_id)
+                    self.log(f"Skipping '{account['label']}': completed today.")
+                else:
+                    runnable_accounts.append(account)
+
+            total = len(runnable_accounts)
+            skipped_count = len(skipped)
+            self._notify_batch_ui(
+                "running", completed=0, total=total, skipped=skipped_count
+            )
+
+            for account in runnable_accounts:
+                account_id = account["id"]
+
+                self._select_account_for_batch(account_id)
+                self._notify_batch_ui(
+                    "running",
+                    account["label"],
+                    completed=len(completed),
+                    total=total,
+                    skipped=skipped_count,
+                )
+                schedule = self._get_account_schedule(account_id)
+                pc_count, mobile_count = self._get_batch_query_counts(schedule)
+                outcome = self._run_current_account(
+                    pc_count,
+                    mobile_count,
+                    include_daily_tasks=bool(include_daily_tasks),
+                )
+                daily_task_only_failure = (
+                    bool(include_daily_tasks)
+                    and not outcome.get("stopped")
+                    and not self._stop_event.is_set()
+                    and outcome.get("error") in _DAILY_TASK_FAILURE_ERRORS
+                    and outcome.get("pc_completed") == pc_count
+                    and outcome.get("mobile_completed") == mobile_count
+                )
+                if outcome.get("completed") or daily_task_only_failure:
+                    self._mark_account_completed_today(account_id)
+                    completed.append(account_id)
+                    if daily_task_only_failure:
+                        daily_task_failure_accounts.append(
+                            {"id": account_id, "label": account["label"]}
+                        )
+                        self.log(
+                            f"[WARNING] Daily Tasks failed for '{account['label']}', "
+                            "but all searches completed. Continuing the batch."
+                        )
+                    else:
+                        self.log(f"Completed '{account['label']}'.")
+                    continue
+
+                stopped = bool(outcome.get("stopped") or self._stop_event.is_set())
+                status = "stopped" if stopped else "failed"
+                if stopped:
+                    self.log(f"Batch stopped at '{account['label']}'.")
+                else:
+                    self.log(
+                        f"[ERROR] Batch failed at '{account['label']}': "
+                        f"{outcome.get('error') or 'unknown error'}"
+                    )
+                return {
+                    "status": status,
+                    "completed_account_ids": completed,
+                    "skipped_account_ids": skipped,
+                    "failed_account_id": account_id,
+                    "error": outcome.get("error"),
+                    "daily_task_failure_accounts": daily_task_failure_accounts,
+                }
+
+            if daily_task_failure_accounts:
+                labels = ", ".join(
+                    account["label"] for account in daily_task_failure_accounts
+                )
+                self.log(
+                    "[WARNING] Batch completed with Daily Tasks needing attention for: "
+                    f"{labels}."
+                )
+            return {
+                "status": "completed",
+                "completed_account_ids": completed,
+                "skipped_account_ids": skipped,
+                "failed_account_id": None,
+                "daily_task_failure_accounts": daily_task_failure_accounts,
+            }
+        finally:
+            if original_account_id is not None:
+                try:
+                    self._select_account_for_batch(original_account_id)
+                except Exception:
+                    pass
+            self._notify_batch_ui("idle")
+            if lease is not None:
+                lease.release()
+            self._run_lock.release()
 
     def get_schedule(self, account_id):
         """Return a specific account's schedule (defaults merged in)."""
@@ -734,11 +974,7 @@ class AutoRewarderAPI:
         account's meta.json, so we just drop the global one. Anything
         valuable was already migrated during a previous upgrade cycle.
         """
-        try:
-            settings = self.global_settings.settings_for_update()
-        except OSError as e:
-            self._safe_log(f"[WARNING] Could not read settings.json: {e}")
-            return
+        settings = self.global_settings.get_settings()
         if "schedule" in settings:
             settings.pop("schedule", None)
             self.global_settings.save_settings(settings)
@@ -859,7 +1095,7 @@ class AutoRewarderAPI:
 
         # Mark current schema applied so we don't re-run unnecessarily.
         try:
-            settings = self.global_settings.settings_for_update()
+            settings = self.global_settings.get_settings()
             settings["autostart_schema_version"] = self._AUTOSTART_SCHEMA_VERSION
             self.global_settings.save_settings(settings)
         except Exception:
@@ -1365,11 +1601,7 @@ class AutoRewarderAPI:
 
         # Persist user intent FIRST so _sync_account_autostart reads the
         # new value when it queries is_autostart_enabled().
-        try:
-            settings = self.global_settings.settings_for_update()
-        except OSError as e:
-            self.log(f"[ERROR] Could not save the autostart setting: {e}")
-            return False
+        settings = self.global_settings.get_settings()
         settings["autoStartUp"] = bool(enable)
         self.global_settings.save_settings(settings)
 
@@ -1420,12 +1652,9 @@ class AutoRewarderAPI:
         ok = self._set_autostart_registry(bool(enabled))
         if ok:
             # Mirror the state into global settings.json for the UI.
-            try:
-                settings = self.global_settings.settings_for_update()
-                settings["autoStartUp"] = bool(enabled)
-                self.global_settings.save_settings(settings)
-            except OSError as e:
-                self._safe_log(f"[WARNING] Could not mirror autostart state: {e}")
+            settings = self.global_settings.get_settings()
+            settings["autoStartUp"] = bool(enabled)
+            self.global_settings.save_settings(settings)
         return ok
 
     # ------------------------------------------------------------------
@@ -1771,6 +2000,39 @@ class AutoRewarderAPI:
             return []
         return self.history.get_history()
 
+    def get_run_history(self):
+        """Return newest-first structured run summaries for the current account."""
+        if self.stats is None:
+            return []
+        stats = self.stats.get_stats()
+        recent_runs = stats.get("recent_runs", [])
+        if not isinstance(recent_runs, list):
+            recent_runs = []
+        runs = list(reversed([run for run in recent_runs if isinstance(run, dict)]))
+        if runs:
+            return runs
+
+        # Profiles created before the run ledger only have a last-session
+        # summary. Surface that single record until a new structured run is
+        # recorded, rather than showing an apparently empty history.
+        last_session = stats.get("last_session", {})
+        if not isinstance(last_session, dict) or not last_session.get("ended_at"):
+            return []
+        return [
+            {
+                "ended_at": last_session.get("ended_at"),
+                "status": "recorded",
+                "error": None,
+                "pc_searches": last_session.get("pc_searches", 0),
+                "mobile_searches": last_session.get("mobile_searches", 0),
+                "daily_cards": last_session.get("daily_cards", 0),
+                "earn_cards": last_session.get("earn_cards", 0),
+                "quest_tasks": last_session.get("quest_tasks", 0),
+                "points_estimate": last_session.get("points_estimate", 0),
+                "points_delta": last_session.get("points_delta"),
+            }
+        ]
+
     # ------------------------------------------------------------------
     # Statistics (scoped to current account)
     # ------------------------------------------------------------------
@@ -2078,8 +2340,36 @@ class AutoRewarderAPI:
             time.sleep(seconds)
             return self._stop_event.is_set()
 
+    @staticmethod
+    def _new_run_outcome():
+        """Create the public result shape for one account run."""
+        return {
+            "completed": False,
+            "stopped": False,
+            "error": None,
+            "pc_completed": 0,
+            "mobile_completed": 0,
+            "daily_success": None,
+        }
+
+    def _reset_session_state(self):
+        """Reset the counters that are persisted after one account run."""
+        self._session_counts = {
+            "pc": 0,
+            "mobile": 0,
+            "cards": 0,
+            "earn": 0,
+            "quests": 0,
+        }
+        self._last_scraped_balance = None
+
     def _run_advanced_schedule(
-        self, pc_count, mobile_count, duration_hours, queries_per_hour
+        self,
+        pc_count,
+        mobile_count,
+        duration_hours,
+        queries_per_hour,
+        include_daily_tasks,
     ):
         """
         Drip-feed queries across a duration using the GUI run pipeline.
@@ -2119,9 +2409,11 @@ class AutoRewarderAPI:
             f"Advanced scheduling: PC={pc}, Mobile={mobile} over {duration_hours}h (qph={qph})"
         )
 
+        outcome = self._new_run_outcome()
         if total <= 0:
             self.log("[WARNING] Nothing to do (PC and Mobile counts are both 0).")
-            return
+            outcome["error"] = "no_queries"
+            return outcome
 
         if qph > 0:
             raw_batch = qph // 6  # ~10-minute batches
@@ -2139,10 +2431,12 @@ class AutoRewarderAPI:
 
         pc_left = pc
         mobile_left = mobile
+        ran_daily_set = False
 
         for i in range(num_batches):
             if self._stop_event.is_set():
-                break
+                outcome["stopped"] = True
+                return outcome
 
             if pc_left > 0:
                 batch_pc = min(per_batch, pc_left)
@@ -2160,10 +2454,35 @@ class AutoRewarderAPI:
             )
 
             if batch_pc > 0 and not self._stop_event.is_set():
-                self._run_phase(mobile=False, count=batch_pc, do_daily_set=True)
+                phase = self._run_phase(
+                    mobile=False,
+                    count=batch_pc,
+                    do_daily_set=bool(include_daily_tasks and not ran_daily_set),
+                )
+                outcome["pc_completed"] += phase["completed"]
+                if phase["daily_success"] is not None:
+                    ran_daily_set = True
+                    outcome["daily_success"] = phase["daily_success"]
+                daily_task_only_failure = (
+                    phase["error"] in _DAILY_TASK_FAILURE_ERRORS
+                    and phase["completed"] == batch_pc
+                )
+                if daily_task_only_failure:
+                    outcome["error"] = phase["error"]
+                elif phase["error"] or phase["completed"] != batch_pc:
+                    outcome["error"] = phase["error"] or "pc_search_incomplete"
+                    outcome["stopped"] = self._stop_event.is_set()
+                    return outcome
 
             if batch_mobile > 0 and not self._stop_event.is_set():
-                self._run_phase(mobile=True, count=batch_mobile, do_daily_set=False)
+                phase = self._run_phase(
+                    mobile=True, count=batch_mobile, do_daily_set=False
+                )
+                outcome["mobile_completed"] += phase["completed"]
+                if phase["error"] or phase["completed"] != batch_mobile:
+                    outcome["error"] = phase["error"] or "mobile_search_incomplete"
+                    outcome["stopped"] = self._stop_event.is_set()
+                    return outcome
 
             pc_left -= batch_pc
             mobile_left -= batch_mobile
@@ -2171,17 +2490,126 @@ class AutoRewarderAPI:
             if pc_left <= 0 and mobile_left <= 0:
                 break
             if self._stop_event.is_set():
-                break
+                outcome["stopped"] = True
+                return outcome
 
             sleep_time = max(5.0, interval * random.uniform(0.75, 1.25))
             self.log(f"Sleeping {sleep_time:.1f}s until next batch")
             if self._sleep_with_stop(sleep_time):
-                break
+                outcome["stopped"] = True
+                return outcome
 
-        if not self._stop_event.is_set() and pc_left <= 0 and mobile_left <= 0:
-            self.log("Advanced schedule completed!")
+        if self._stop_event.is_set():
+            outcome["stopped"] = True
+            return outcome
+        if pc_left > 0 or mobile_left > 0:
+            outcome["error"] = "schedule_incomplete"
+            return outcome
+        if include_daily_tasks and pc > 0 and outcome["daily_success"] is False:
+            outcome["error"] = outcome["error"] or "daily_tasks_failed"
+            return outcome
+        outcome["completed"] = True
+        self.log("Advanced schedule completed!")
+        return outcome
 
-    def main(self, pc_count, mobile_count=0, daily_only=False):
+    def _run_current_account(self, pc_count, mobile_count, include_daily_tasks=True):
+        """Run the selected account once and return a structured outcome."""
+        try:
+            pc = max(0, int(pc_count or 0))
+            mobile = max(0, int(mobile_count or 0))
+        except (TypeError, ValueError):
+            pc, mobile = 0, 0
+
+        outcome = self._new_run_outcome()
+        if pc == 0 and mobile == 0:
+            outcome["error"] = "no_queries"
+            return outcome
+
+        self._reset_session_state()
+        schedule = self._get_account_schedule(self.account_manager.current_id())
+        use_advanced = bool(
+            schedule.get("enabled") and schedule.get("advancedScheduling")
+        )
+
+        try:
+            if use_advanced:
+                self.log("Advanced scheduling enabled. Using scheduled pacing.")
+                outcome = self._run_advanced_schedule(
+                    pc,
+                    mobile,
+                    schedule.get("runDuration", 3),
+                    schedule.get("queriesPerHour", 10),
+                    include_daily_tasks,
+                )
+                return outcome
+            else:
+                if pc > 0:
+                    phase = self._run_phase(
+                        mobile=False,
+                        count=pc,
+                        do_daily_set=bool(include_daily_tasks),
+                    )
+                    outcome["pc_completed"] = phase["completed"]
+                    outcome["daily_success"] = phase["daily_success"]
+                    daily_task_only_failure = (
+                        phase["error"] in _DAILY_TASK_FAILURE_ERRORS
+                        and phase["completed"] == pc
+                    )
+                    if daily_task_only_failure:
+                        outcome["error"] = phase["error"]
+                    elif phase["error"] or phase["completed"] != pc:
+                        outcome["error"] = phase["error"] or "pc_search_incomplete"
+                        outcome["stopped"] = self._stop_event.is_set()
+                        return outcome
+
+                if mobile > 0:
+                    if self._stop_event.is_set():
+                        outcome["stopped"] = True
+                        return outcome
+                    phase = self._run_phase(
+                        mobile=True, count=mobile, do_daily_set=False
+                    )
+                    outcome["mobile_completed"] = phase["completed"]
+                    if phase["error"] or phase["completed"] != mobile:
+                        outcome["error"] = phase["error"] or "mobile_search_incomplete"
+                        outcome["stopped"] = self._stop_event.is_set()
+                        return outcome
+
+                if self._stop_event.is_set():
+                    outcome["stopped"] = True
+                    return outcome
+                if include_daily_tasks and pc > 0 and outcome["daily_success"] is False:
+                    outcome["error"] = outcome["error"] or "daily_tasks_failed"
+                    return outcome
+                outcome["completed"] = True
+                return outcome
+        except Exception as e:
+            self.log(f"[ERROR] Account run failed: {e}")
+            outcome["error"] = str(e)[:120]
+            outcome["stopped"] = self._stop_event.is_set()
+            return outcome
+        finally:
+            self._record_session_stats(outcome=outcome)
+
+    def _watch_scheduled_stop_request(self, lease):
+        """Return an event that stops the watcher for an external batch request."""
+        watcher_done = threading.Event()
+        if self.run_origin != RUN_ORIGIN_SCHEDULED:
+            return watcher_done
+
+        def watch():
+            while not watcher_done.wait(0.25):
+                if lease.stop_requested():
+                    self.log("Batch run requested; stopping scheduled run…")
+                    self.stop()
+                    return
+
+        threading.Thread(target=watch, daemon=True).start()
+        return watcher_done
+
+    def main(
+        self, pc_count, mobile_count=0, daily_only=False, include_daily_tasks=True
+    ):
         """
         Run the bot against the currently-selected account.
 
@@ -2204,13 +2632,13 @@ class AutoRewarderAPI:
             self.log("[ERROR] No account selected. Add one via the dropdown.")
             if self._webview_window:
                 self._webview_window.evaluate_js("enable_start_button()")
-            return
+            return {**self._new_run_outcome(), "error": "no_account"}
 
         if self.account_meta is None or not self.account_meta.is_first_setup_done():
             self.log("[ERROR] First Setup has not been completed for this account.")
             if self._webview_window:
                 self._webview_window.evaluate_js("enable_start_button()")
-            return
+            return {**self._new_run_outcome(), "error": "setup_required"}
 
         daily_only = bool(daily_only)
 
@@ -2224,51 +2652,27 @@ class AutoRewarderAPI:
             self.log("[WARNING] Nothing to do (PC and Mobile counts are both 0).")
             if self._webview_window:
                 self._webview_window.evaluate_js("enable_start_button()")
-            return
-
-        schedule = {}
-        if not daily_only and self.account_meta is not None:
-            try:
-                schedule = self.account_meta.get_schedule() or {}
-            except Exception:
-                schedule = {}
-
-        schedule_enabled = isinstance(schedule, dict) and bool(schedule.get("enabled"))
-        use_advanced = (
-            not daily_only
-            and schedule_enabled
-            and bool(schedule.get("advancedScheduling"))
-        )
-
-        if (
-            not daily_only
-            and isinstance(schedule, dict)
-            and bool(schedule.get("advancedScheduling"))
-            and not schedule_enabled
-        ):
-            self.log(
-                "[WARNING] Advanced scheduling is enabled, but Schedule is off. Running normal pace."
-            )
+            return {**self._new_run_outcome(), "error": "no_queries"}
 
         if not self._run_lock.acquire(blocking=False):
             self.log("[WARNING] A run is already in progress.")
-            return
+            return {**self._new_run_outcome(), "error": "busy"}
+
+        lease = self.run_coordinator.acquire(self.run_origin)
+        if lease is None:
+            self.log("[WARNING] Another AutoRewarder run is already active.")
+            self._run_lock.release()
+            if self._webview_window:
+                try:
+                    self._webview_window.evaluate_js("enable_start_button()")
+                except Exception:
+                    pass
+            return {**self._new_run_outcome(), "error": "busy"}
 
         # Reset stop flag before each run so a previous Stop doesn't carry over.
         self._stop_event.clear()
-
-        # Reset per-run stats accumulators. _run_phase / _run_daily_only feed
-        # these; _record_session_stats() folds them into stats.json at the end.
-        self._session_counts = {
-            "pc": 0,
-            "mobile": 0,
-            "cards": 0,
-            "earn": 0,
-            "quests": 0,
-        }
-        self._last_scraped_balance = None
-        self._daily_set_attempted = False
-        self._visual_search_attempted = False
+        outcome = self._new_run_outcome()
+        stop_watcher_done = self._watch_scheduled_stop_request(lease)
 
         try:
             if daily_only:
@@ -2284,48 +2688,37 @@ class AutoRewarderAPI:
                     pass
 
             if daily_only:
-                self._run_daily_only()
+                self._reset_session_state()
+                outcome = self._run_daily_only()
+                self._record_session_stats(outcome=outcome)
             else:
-                if use_advanced:
-                    duration = schedule.get("runDuration", 3)
-                    qph = schedule.get("queriesPerHour", 10)
-                    self.log("Advanced scheduling enabled. Using scheduled pacing.")
-                    self._run_advanced_schedule(pc_count, mobile_count, duration, qph)
-                else:
-                    if pc_count > 0 and not self._stop_event.is_set():
-                        self._run_phase(mobile=False, count=pc_count, do_daily_set=True)
+                outcome = self._run_current_account(
+                    pc_count,
+                    mobile_count,
+                    include_daily_tasks=include_daily_tasks,
+                )
 
-                    if mobile_count > 0 and not self._stop_event.is_set():
-                        self._run_phase(
-                            mobile=True, count=mobile_count, do_daily_set=False
-                        )
-
-            if self._stop_event.is_set():
+            if outcome["stopped"]:
                 self.log("Stopped.")
-            else:
+            elif outcome["completed"]:
                 self.log("Done!")
-
-                if self.account_meta is not None:
-                    try:
-                        from datetime import date
-
-                        current_schedule = self.account_meta.get_schedule()
-                        if isinstance(current_schedule, dict):
-                            current_schedule["last_triggered_date"] = (
-                                date.today().isoformat()
-                            )
-                            self.account_meta.set_schedule(current_schedule)
-                    except Exception as e:
-                        self.log(f"[WARNING] Failed to update deduplication date: {e}")
+                if not daily_only:
+                    self._mark_account_completed_today(
+                        self.account_manager.current_id()
+                    )
+            else:
+                self.log(
+                    f"[ERROR] Run incomplete: {outcome['error'] or 'unknown error'}"
+                )
+            return outcome
         finally:
-            # Persist this run's activity + balance before unlocking, so a
-            # GUI refresh triggered by enable_start_button() reads fresh stats.
-            self._record_session_stats()
+            stop_watcher_done.set()
             try:
                 if self._webview_window:
                     self._webview_window.evaluate_js("enable_start_button()")
             except Exception:
                 pass
+            lease.release()
             self._run_lock.release()
 
     def _try_scrape_balance(self):
@@ -2336,7 +2729,7 @@ class AutoRewarderAPI:
         scraped earlier from the rewards dashboard.
         """
         if self._driver is None:
-            return
+            return {**self._new_run_outcome(), "error": "daily_tasks_unavailable"}
         try:
             value = scrape_points_balance(self._driver, self.log)
         except Exception:
@@ -2344,7 +2737,7 @@ class AutoRewarderAPI:
         if value is not None:
             self._last_scraped_balance = value
 
-    def _record_session_stats(self):
+    def _record_session_stats(self, outcome=None):
         """
         Fold this run's accumulated counters + scraped balance into stats.json
         and ask the GUI (if attached) to refresh the stats card.
@@ -2359,6 +2752,7 @@ class AutoRewarderAPI:
                 earn_cards=self._session_counts.get("earn", 0),
                 quest_tasks=self._session_counts.get("quests", 0),
                 balance=self._last_scraped_balance,
+                outcome=outcome,
             )
         except Exception as e:
             self.log(f"[WARNING] Failed to record stats: {e}")
@@ -2393,60 +2787,62 @@ class AutoRewarderAPI:
         Open a PC driver, run only the Daily Set + More Activities, scrape
         the points balance, then quit. No Bing searches are performed.
 
-        A task already marked as done today is skipped, unless the matching
-        "Force daily tasks" / "Force visual search" setting is on. When forced,
-        the card-level detection inside perform_daily_set still skips cards that
-        are genuinely complete, and the visual search picks an image it has not
-        used recently, so re-running on a real already-done day just confirms
-        state without wasting clicks.
+        Unlike the normal flow, this path is user-initiated (explicit toggle)
+        so it ignores `should_perform_daily_set()` — if the saved status says
+        "done today" but the user clicked Start anyway, they want it to run.
+        The card-level detection inside perform_daily_set will skip cards
+        that are genuinely complete, so re-running on a real already-done day
+        just confirms state without wasting clicks.
         """
         if self.daily_set is None:
             self.log("[ERROR] Daily tasks unavailable for this account.")
             return
 
-        force = self.global_settings.get_force_tasks()
-        daily_done = not self.daily_set.should_perform_daily_set()
-        run_daily_set = not daily_done or force["force_daily_tasks"]
+        if not self.daily_set.should_perform_daily_set():
+            self.log(
+                "Note: today is already marked as done in status.json, "
+                "but running anyway since you asked explicitly."
+            )
 
         self.log("=== Daily tasks and Visual Search only ===")
 
-        if daily_done and run_daily_set:
-            self.log(
-                "Daily tasks already marked as done today, but running anyway "
-                "(Force daily tasks is ON)."
-            )
-
         self._driver = self.driver_manager.setup_driver(mobile=False)
         try:
-            if run_daily_set:
-                self._daily_set_attempted = True
-                human = HumanBehavior(self._driver, show_cursor=True, mobile=False)
-                success = self.daily_set.perform_daily_set(
-                    self._driver, human, stop_event=self._stop_event
-                )
-                # Record cards completed + scrape the balance while we're still
-                # on the rewards dashboard, before any Stop check returns early.
-                totals = self.daily_set.last_totals
-                self._session_counts["cards"] += totals.get("newly", 0)
-                self._session_counts["earn"] += totals.get("earn", 0)
-                self._session_counts["quests"] += totals.get("quests", 0)
-                self._try_scrape_balance()
-                if self._stop_event.is_set():
-                    self.log("Daily tasks aborted by Stop.")
-                    return
-                if success:
-                    self.daily_set.mark_as_completed()
-                    self.log("Daily tasks completed and marked as done for today.")
-                else:
-                    self.log("Daily tasks failed. Not marked as done for today.")
+            human = HumanBehavior(self._driver, show_cursor=True, mobile=False)
+            success = self.daily_set.perform_daily_set(
+                self._driver, human, stop_event=self._stop_event
+            )
+            # Record cards completed + scrape the balance while we're still on
+            # the rewards dashboard, before any Stop check returns early.
+            totals = self.daily_set.last_totals
+            self._session_counts["cards"] += totals.get("newly", 0)
+            self._session_counts["earn"] += totals.get("earn", 0)
+            self._session_counts["quests"] += totals.get("quests", 0)
+            self._try_scrape_balance()
+            if self._stop_event.is_set():
+                self.log("Daily tasks aborted by Stop.")
+                return {
+                    **self._new_run_outcome(),
+                    "stopped": True,
+                    "error": "stopped",
+                }
+            if success:
+                self.daily_set.mark_as_completed()
+                self.log("Daily tasks completed and marked as done for today.")
+                return {
+                    **self._new_run_outcome(),
+                    "completed": True,
+                    "daily_success": True,
+                }
             else:
-                self.log(
-                    "Daily tasks already completed today. Skipping. "
-                    "(Enable 'Force daily tasks' in Settings to run them anyway.)"
-                )
-                self._try_scrape_balance()
+                self.log("Daily tasks failed. Not marked as done for today.")
+                return {
+                    **self._new_run_outcome(),
+                    "error": "daily_tasks_failed",
+                    "daily_success": False,
+                }
 
-            # Run the visual search even if the Daily Set failed or was skipped.
+            # Run visual search if needed, even if the Daily Set failed
             if not self._stop_event.is_set():
                 self._run_visual_search_if_needed()
 
@@ -2538,38 +2934,23 @@ class AutoRewarderAPI:
         Checks if the task is needed today, generates a unique image,
         performs the search, and updates the status after successful completion.
 
-        A day already marked as done is skipped, unless the "Force visual
-        search" setting is on — the saved status can be stale (a search that
-        was credited but is worth redoing, or a status file the user doesn't
-        trust), and that toggle is how the user says so.
-
         Returns:
             bool: True if visual search was performed, False otherwise.
         """
         if self.daily_set is None or self.search_engine is None:
             return False
 
-        force = (
-            not self._visual_search_attempted
-            and self.global_settings.get_force_tasks()["force_visual_search"]
-        )
-        already_done = not self.daily_set.should_perform_visual_search()
-
-        if already_done and not force:
+        force_visual_search = self.global_settings.get_force_tasks()[
+            "force_visual_search"
+        ]
+        if not self.daily_set.should_perform_visual_search() and not force_visual_search:
             self.log("Visual Search already completed today. Skipping.")
             return False
 
-        if already_done:
-            self.log(
-                "Visual Search already marked as done today, but running anyway "
-                "(Force visual search is ON)."
-            )
+        if force_visual_search:
+            self.log("Force visual search is ON. Starting Visual Search task...")
         else:
-            self.log(
-                "Visual Search not completed today. Starting Visual Search task..."
-            )
-
-        self._visual_search_attempted = True
+            self.log("Visual Search not completed today. Starting Visual Search task...")
 
         used_images = self.daily_set.get_used_visual_search_images()
 
@@ -2585,38 +2966,14 @@ class AutoRewarderAPI:
                 self._driver,
                 image_path,
                 stop_event=self._stop_event,
-                entry_url=getattr(self.daily_set, "visual_search_url", None),
             )
 
-            # Rewards is the authority, in both directions: a results page is
-            # not proof of credit, and Bing rendering the results somewhere we
-            # didn't recognise is not proof of failure. So ask the mission.
-            stopped = self._stop_event is not None and self._stop_event.is_set()
-            credited = None if stopped else self._check_visual_search_credited()
-
-            # The image reached Bing in either of these cases, so don't offer it
-            # again on the next run.
-            if success or credited is True:
+            if success:
                 self.daily_set.save_used_visual_search_images(updated_images)
+                self.daily_set.mark_visual_search_as_completed()
+                self.log("Visual search marked as done for today.")
 
-            if not success:
-                if credited is not True:
-                    return False
-                self.log(
-                    "Bing's results page never loaded, but Rewards counted the "
-                    "search anyway."
-                )
-            elif credited is False:
-                self.log(
-                    "[WARNING] Rewards did not count the visual search. "
-                    "Not marked as done for today."
-                )
-                return False
-
-            self.daily_set.mark_visual_search_as_completed()
-            self.log("Visual search marked as done for today.")
-
-            return True
+            return success
 
         except Exception as e:
             self.log(f"[WARNING] Visual search failed: {e}")
@@ -2628,32 +2985,6 @@ class AutoRewarderAPI:
                     os.remove(image_path)
                 except Exception as e:
                     self.log(f"[WARNING] Failed to remove temporary image file: {e}")
-
-    def _check_visual_search_credited(self):
-        """
-        Check the Rewards "visual search streak" mission after a search.
-
-        Returns:
-            bool: True when the mission counted the search, False when it
-                explicitly still shows no activity today, or None when there
-                is nothing to compare against (legacy dashboard, mission not
-                offered, or the progress couldn't be read).
-        """
-        try:
-            progress = self.daily_set.read_visual_search_progress(self._driver)
-        except Exception as e:
-            self.log(f"[WARNING] Could not read the visual search mission: {e}")
-            return None
-
-        if progress is None:
-            return None
-
-        done, total = progress
-        before = getattr(self.daily_set, "visual_search_progress", None)
-        was = f" (was {before[0]}/{before[1]})" if before else ""
-        self.log(f"Rewards visual search streak: {done}/{total}{was}")
-
-        return done > 0
 
     def _run_phase(self, mobile, count, do_daily_set):
         """
@@ -2677,9 +3008,25 @@ class AutoRewarderAPI:
                 self.history.add_to_history(
                     "N/A", f"[ERROR] {label}: no queries available"
                 )
-            return
+            return {
+                "expected": count,
+                "completed": 0,
+                "daily_success": None,
+                "error": "no_queries",
+            }
 
-        self._driver = self.driver_manager.setup_driver(mobile=mobile)
+        try:
+            self._driver = self.driver_manager.setup_driver(mobile=mobile)
+        except Exception as e:
+            self.log(f"[ERROR] Could not start {label} driver: {e}")
+            return {
+                "expected": count,
+                "completed": 0,
+                "daily_success": None,
+                "error": "driver_start_failed",
+            }
+        daily_success = None
+        phase_error = None
         try:
             done = self.search_engine.perform_searches(
                 self._driver,
@@ -2692,60 +3039,40 @@ class AutoRewarderAPI:
             self._session_counts[bucket] += int(done or 0)
 
             ran_daily_set = False
-
-            # Only the PC phase runs the Daily Set, and a day already marked as
-            # done is skipped unless "Force daily tasks" is on.
-            daily_done = False
-            force_daily = False
-            if do_daily_set and self.daily_set is not None:
-                daily_done = not self.daily_set.should_perform_daily_set()
-                force_daily = (
-                    not self._daily_set_attempted
-                    and self.global_settings.get_force_tasks()["force_daily_tasks"]
-                )
-
-            if (
-                do_daily_set
-                and self.daily_set is not None
-                and not self._stop_event.is_set()
-                and (not daily_done or force_daily)
-            ):
-                if daily_done:
-                    self.log(
-                        "Daily Set already marked as done today, but running "
-                        "anyway (Force daily tasks is ON)."
-                    )
-                else:
+            if do_daily_set and not self._stop_event.is_set():
+                if self.daily_set is None:
+                    daily_success = False
+                    phase_error = "daily_tasks_unavailable"
+                elif self.daily_set.should_perform_daily_set() or self.global_settings.get_force_tasks()[
+                    "force_daily_tasks"
+                ]:
                     self.log(
                         "Daily Set not completed today. Starting Daily Set tasks..."
                     )
-                human = HumanBehavior(self._driver, show_cursor=True, mobile=mobile)
-                success = self.daily_set.perform_daily_set(
-                    self._driver, human, stop_event=self._stop_event
-                )
-                ran_daily_set = True
-                self._daily_set_attempted = True
-                # Record cards + scrape the balance while still on the rewards
-                # dashboard, before the Stop check can short-circuit.
-                totals = self.daily_set.last_totals
-                self._session_counts["cards"] += totals.get("newly", 0)
-                self._session_counts["earn"] += totals.get("earn", 0)
-                self._session_counts["quests"] += totals.get("quests", 0)
-                self._try_scrape_balance()
-                if not self._stop_event.is_set():
-                    if success:
-                        self.daily_set.mark_as_completed()
-                        self.log(
-                            "Daily Set tasks completed and marked as done for today."
-                        )
-                    else:
-                        self.log("Daily Set failed. Not marked as done for today.")
-
-            elif daily_done and not self._stop_event.is_set():
-                self.log(
-                    "Daily Set already completed today. Skipping. "
-                    "(Enable 'Force daily tasks' in Settings to run it anyway.)"
-                )
+                    human = HumanBehavior(self._driver, show_cursor=True, mobile=mobile)
+                    success = self.daily_set.perform_daily_set(
+                        self._driver, human, stop_event=self._stop_event
+                    )
+                    ran_daily_set = True
+                    # Record cards + scrape the balance while still on the rewards
+                    # dashboard, before the Stop check can short-circuit.
+                    totals = self.daily_set.last_totals
+                    self._session_counts["cards"] += totals.get("newly", 0)
+                    self._session_counts["earn"] += totals.get("earn", 0)
+                    self._session_counts["quests"] += totals.get("quests", 0)
+                    self._try_scrape_balance()
+                    daily_success = bool(success)
+                    if not self._stop_event.is_set():
+                        if success:
+                            self.daily_set.mark_as_completed()
+                            self.log(
+                                "Daily Set tasks completed and marked as done for today."
+                            )
+                        else:
+                            phase_error = "daily_tasks_failed"
+                            self.log("Daily Set failed. Not marked as done for today.")
+                else:
+                    daily_success = True
 
             # Visual search runs only in PC phase,
             # do_daily_set=False in Mobile phase.
@@ -2757,6 +3084,22 @@ class AutoRewarderAPI:
             # usable fallback source for the balance.
             if not ran_daily_set and not self._stop_event.is_set():
                 self._try_scrape_balance()
+
+            return {
+                "expected": count,
+                "completed": int(done or 0),
+                "daily_success": daily_success,
+                "error": phase_error,
+            }
+
+        except Exception as e:
+            self.log(f"[ERROR] {label} phase failed: {e}")
+            return {
+                "expected": count,
+                "completed": 0,
+                "daily_success": daily_success,
+                "error": "phase_failed",
+            }
 
         finally:
             try:

@@ -12,3 +12,14 @@ build/
 # Virtual environments
 .venv/
 venv/
+
+# Local agent tooling and generated planning artifacts
+.agents/
+.codex/
+.impeccable/
+docs/superpowers/
+
+# Local design and planning artifacts
+DESIGN.md
+PRODUCT.md
+UI_Redesign/

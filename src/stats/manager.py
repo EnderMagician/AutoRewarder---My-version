@@ -32,6 +32,11 @@ POINTS_PER_CARD = 10
 # — which fire one session per query — can't evict older days.
 _DAILY_KEEP = 90
 
+# A concise per-run ledger powers the history window. It intentionally has a
+# fixed cap so an account with frequent advanced-schedule runs cannot grow its
+# local stats file without bound.
+_RECENT_RUN_KEEP = 100
+
 # JS executed on rewards.bing.com (or a Bing SERP) to read the user's current
 # available-points balance. Works on both the legacy mee-rewards-* dashboard
 # (DOM selectors) and the new Next.js dashboard (RSC payload in window.__next_f).
@@ -243,6 +248,9 @@ class StatsManager:
             # "YYYY-MM-DD" → {pc, mobile, cards, runs}. Capped to _DAILY_KEEP
             # days. Per-day (not per-run) so a busy day can't evict old days.
             "daily": {},
+            # Recent, structured run summaries for the history ledger. Unlike
+            # the query log, this answers what a run accomplished.
+            "recent_runs": [],
         }
 
     @staticmethod
@@ -254,6 +262,14 @@ class StatsManager:
         for k in keys[:-_DAILY_KEEP]:
             daily.pop(k, None)
         return daily
+
+    @staticmethod
+    def _trim_recent_runs(runs):
+        """Keep only the newest bounded set of valid run-summary records."""
+        if not isinstance(runs, list):
+            return []
+        valid = [run for run in runs if isinstance(run, dict)]
+        return valid[-_RECENT_RUN_KEEP:]
 
     @staticmethod
     def _daily_from_runs(runs):
@@ -294,6 +310,7 @@ class StatsManager:
             merged["daily"] = self._trim_daily(dict(daily))
         elif isinstance(data.get("runs"), list):
             merged["daily"] = self._trim_daily(self._daily_from_runs(data["runs"]))
+        merged["recent_runs"] = self._trim_recent_runs(data.get("recent_runs"))
         return merged
 
     def get_stats(self):
@@ -361,6 +378,7 @@ class StatsManager:
         earn_cards=0,
         quest_tasks=0,
         balance=None,
+        outcome=None,
     ):
         """
         Record one completed run: bump lifetime counters, refresh the
@@ -374,6 +392,8 @@ class StatsManager:
             earn_cards (int): /earn point-earning cards opened this run.
             quest_tasks (int): quest punchcard tasks opened this run.
             balance (int | None): scraped real balance, or None if unavailable.
+            outcome (dict | None): structured run result with completed,
+                stopped, and error fields for the history ledger.
 
         Returns:
             dict: the updated stats structure (also persisted to disk).
@@ -384,8 +404,18 @@ class StatsManager:
         earn = max(0, int(earn_cards or 0))
         quests = max(0, int(quest_tasks or 0))
 
-        # Nothing happened (e.g. an empty batch in advanced scheduling and no
-        # balance to refresh) — don't pollute the timeline with a no-op run.
+        outcome = outcome if isinstance(outcome, dict) else {}
+        if outcome.get("stopped"):
+            status = "stopped"
+        elif outcome.get("completed", True):
+            status = "completed"
+        else:
+            status = "failed"
+        error = outcome.get("error")
+
+        # Nothing happened (e.g. an empty completed batch in advanced
+        # scheduling and no balance to refresh) — don't pollute the timeline
+        # with a no-op run. Failed/stopped attempts still matter to history.
         if (
             pc == 0
             and mobile == 0
@@ -393,6 +423,7 @@ class StatsManager:
             and earn == 0
             and quests == 0
             and (balance is None)
+            and status == "completed"
         ):
             return self.get_stats()
 
@@ -435,6 +466,22 @@ class StatsManager:
             "points_estimate": session_estimate,
             "points_delta": points_delta,
         }
+
+        stats["recent_runs"].append(
+            {
+                "ended_at": now_iso,
+                "status": status,
+                "error": str(error)[:120] if error else None,
+                "pc_searches": pc,
+                "mobile_searches": mobile,
+                "daily_cards": cards,
+                "earn_cards": earn,
+                "quest_tasks": quests,
+                "points_estimate": session_estimate,
+                "points_delta": points_delta,
+            }
+        )
+        stats["recent_runs"] = self._trim_recent_runs(stats["recent_runs"])
 
         # Fold this run into today's per-day aggregate. Pre-existing day
         # buckets from older stats.json files lack the earn/quests keys, so

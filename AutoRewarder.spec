@@ -17,7 +17,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # urllib3 discovers Brotli backends at import time. PyInstaller can bundle
+    # brotlicffi without its extension, producing a partial module that lacks
+    # ``error`` and crashes the frozen app before the UI starts. Brotli support
+    # is optional for AutoRewarder's HTTP requests, so leave both backends out.
+    excludes=['brotli', 'brotli._brotli', 'brotlicffi', 'brotlicffi._brotlicffi'],
     noarchive=False,
     optimize=0,
 )
