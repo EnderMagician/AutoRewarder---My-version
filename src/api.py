@@ -458,6 +458,21 @@ class AutoRewarderAPI:
         state = "ON (X → tray)" if value else "OFF (X → quit)"
         self.log(f"Close-to-tray: {state}. Restart to apply.")
 
+    def get_force_tasks(self):
+        """Return the persisted task rerun preferences."""
+        return self.global_settings.get_force_tasks()
+
+    def set_force_tasks(self, force_daily_tasks, force_visual_search):
+        """Persist whether completed Daily Set and visual-search tasks may rerun."""
+        self.global_settings.set_force_tasks(
+            force_daily_tasks, force_visual_search
+        )
+        self.log(
+            f"Force daily tasks: {'ON' if force_daily_tasks else 'OFF'} - "
+            f"Force visual search: {'ON' if force_visual_search else 'OFF'}"
+        )
+        return True
+
     def get_queries_counts(self):
         """
         Return the saved PC and Mobile query counts from global settings.
@@ -511,7 +526,7 @@ class AutoRewarderAPI:
     def set_batch_include_daily_tasks(self, include_daily_tasks):
         """Persist the Daily tasks choice used by the next account batch."""
         try:
-            settings = self.global_settings.get_settings()
+            settings = self.global_settings.settings_for_update()
             settings["batch_include_daily_tasks"] = bool(include_daily_tasks)
             self.global_settings.save_settings(settings)
             return True
@@ -955,7 +970,7 @@ class AutoRewarderAPI:
         account's meta.json, so we just drop the global one. Anything
         valuable was already migrated during a previous upgrade cycle.
         """
-        settings = self.global_settings.get_settings()
+        settings = self.global_settings.settings_for_update()
         if "schedule" in settings:
             settings.pop("schedule", None)
             self.global_settings.save_settings(settings)
@@ -1046,7 +1061,7 @@ class AutoRewarderAPI:
         """
         legacy = self._detect_legacy_autostart()
         try:
-            settings = self.global_settings.get_settings()
+            settings = self.global_settings.settings_for_update()
             autostartup = bool(settings.get("autoStartUp", False))
             schema_v = int(settings.get("autostart_schema_version", 0))
         except Exception:
@@ -1076,7 +1091,7 @@ class AutoRewarderAPI:
 
         # Mark current schema applied so we don't re-run unnecessarily.
         try:
-            settings = self.global_settings.get_settings()
+            settings = self.global_settings.settings_for_update()
             settings["autostart_schema_version"] = self._AUTOSTART_SCHEMA_VERSION
             self.global_settings.save_settings(settings)
         except Exception:
@@ -1582,7 +1597,7 @@ class AutoRewarderAPI:
 
         # Persist user intent FIRST so _sync_account_autostart reads the
         # new value when it queries is_autostart_enabled().
-        settings = self.global_settings.get_settings()
+        settings = self.global_settings.settings_for_update()
         settings["autoStartUp"] = bool(enable)
         self.global_settings.save_settings(settings)
 
@@ -1633,7 +1648,7 @@ class AutoRewarderAPI:
         ok = self._set_autostart_registry(bool(enabled))
         if ok:
             # Mirror the state into global settings.json for the UI.
-            settings = self.global_settings.get_settings()
+            settings = self.global_settings.settings_for_update()
             settings["autoStartUp"] = bool(enabled)
             self.global_settings.save_settings(settings)
         return ok
@@ -2810,22 +2825,23 @@ class AutoRewarderAPI:
             if success:
                 self.daily_set.mark_as_completed()
                 self.log("Daily tasks completed and marked as done for today.")
-                return {
+                outcome = {
                     **self._new_run_outcome(),
                     "completed": True,
                     "daily_success": True,
                 }
             else:
                 self.log("Daily tasks failed. Not marked as done for today.")
-                return {
+                outcome = {
                     **self._new_run_outcome(),
                     "error": "daily_tasks_failed",
                     "daily_success": False,
                 }
 
-            # Run visual search if needed, even if the Daily Set failed
+            # Run visual search even if the Daily Set failed.
             if not self._stop_event.is_set():
                 self._run_visual_search_if_needed()
+            return outcome
 
         finally:
             try:
@@ -2921,11 +2937,20 @@ class AutoRewarderAPI:
         if self.daily_set is None or self.search_engine is None:
             return False
 
-        if not self.daily_set.should_perform_visual_search():
+        force_visual_search = self.global_settings.get_force_tasks()[
+            "force_visual_search"
+        ]
+        if (
+            not self.daily_set.should_perform_visual_search()
+            and not force_visual_search
+        ):
             self.log("Visual Search already completed today. Skipping.")
             return False
 
-        self.log("Visual Search not completed today. Starting Visual Search task...")
+        if force_visual_search:
+            self.log("Force visual search is ON. Starting Visual Search task...")
+        else:
+            self.log("Visual Search not completed today. Starting Visual Search task...")
 
         used_images = self.daily_set.get_used_visual_search_images()
 
@@ -2941,14 +2966,26 @@ class AutoRewarderAPI:
                 self._driver,
                 image_path,
                 stop_event=self._stop_event,
+                entry_url=getattr(self.daily_set, "visual_search_url", None),
             )
 
-            if success:
+            stopped = self._stop_event.is_set()
+            credited = None if stopped else self._check_visual_search_credited()
+            if success or credited is True:
                 self.daily_set.save_used_visual_search_images(updated_images)
-                self.daily_set.mark_visual_search_as_completed()
-                self.log("Visual search marked as done for today.")
 
-            return success
+            if not success:
+                if credited is not True:
+                    return False
+                self.log("Bing did not show results, but Rewards counted the visual search.")
+            elif credited is False:
+                self.log("[WARNING] Rewards did not count the visual search.")
+                return False
+
+            self.daily_set.mark_visual_search_as_completed()
+            self.log("Visual search marked as done for today.")
+
+            return True
 
         except Exception as e:
             self.log(f"[WARNING] Visual search failed: {e}")
@@ -2960,6 +2997,23 @@ class AutoRewarderAPI:
                     os.remove(image_path)
                 except Exception as e:
                     self.log(f"[WARNING] Failed to remove temporary image file: {e}")
+
+    def _check_visual_search_credited(self):
+        """Return the Rewards mission status after a visual-search attempt."""
+        try:
+            progress = self.daily_set.read_visual_search_progress(self._driver)
+        except Exception as e:
+            self.log(f"[WARNING] Could not read the visual search mission: {e}")
+            return None
+
+        if progress is None:
+            return None
+
+        done, total = progress
+        before = getattr(self.daily_set, "visual_search_progress", None)
+        was = f" (was {before[0]}/{before[1]})" if before else ""
+        self.log(f"Rewards visual search streak: {done}/{total}{was}")
+        return done > 0
 
     def _run_phase(self, mobile, count, do_daily_set):
         """
@@ -3018,10 +3072,16 @@ class AutoRewarderAPI:
                 if self.daily_set is None:
                     daily_success = False
                     phase_error = "daily_tasks_unavailable"
-                elif self.daily_set.should_perform_daily_set():
-                    self.log(
-                        "Daily Set not completed today. Starting Daily Set tasks..."
-                    )
+                elif (
+                    self.daily_set.should_perform_daily_set()
+                    or self.global_settings.get_force_tasks()["force_daily_tasks"]
+                ):
+                    if self.daily_set.should_perform_daily_set():
+                        self.log(
+                            "Daily Set not completed today. Starting Daily Set tasks..."
+                        )
+                    else:
+                        self.log("Force daily tasks is ON. Starting Daily Set tasks...")
                     human = HumanBehavior(self._driver, show_cursor=True, mobile=mobile)
                     success = self.daily_set.perform_daily_set(
                         self._driver, human, stop_event=self._stop_event
