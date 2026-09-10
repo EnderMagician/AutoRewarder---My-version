@@ -405,7 +405,8 @@ input[type="checkbox"]:focus-visible + .toggle-pill { box-shadow: var(--focus); 
 
 .force-task-light svg { width: 18px; height: 18px; }
 
-input[type="checkbox"]:checked + .force-task-light {
+input[type="checkbox"]:checked + .force-task-light,
+.force-task-light.is-enabled {
   border-color: #ffe0a3;
   color: #68451d;
   background: #ffd687;
@@ -421,7 +422,8 @@ input[type="checkbox"]:focus-visible + .force-task-light { box-shadow: var(--foc
 }
 
 @media (prefers-reduced-motion: reduce) {
-  input[type="checkbox"]:checked + .force-task-light { animation: none; }
+  input[type="checkbox"]:checked + .force-task-light,
+  .force-task-light.is-enabled { animation: none; }
 }
 
 /* Ender-eye browser visibility control: the only browser state control on

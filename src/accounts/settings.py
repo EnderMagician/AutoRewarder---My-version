@@ -236,7 +236,7 @@ class GlobalSettingsManager:
 
     def get_force_tasks(self):
         """Return the force flags for the daily tasks and the visual search."""
-        settings = self.settings_for_update()
+        settings = self.get_settings()
         return {
             "force_daily_tasks": bool(settings.get("force_daily_tasks", False)),
             "force_visual_search": bool(settings.get("force_visual_search", False)),

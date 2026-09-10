@@ -1011,6 +1011,30 @@ function close_accounts_modal() {
 // Settings modal (general + scheduled run)
 // =========================================================================
 
+function sync_force_task_controls() {
+  [
+    ['forceDailyToggle', 'Force daily tasks'],
+    ['forceVisualToggle', 'Force visual search'],
+  ].forEach(([id, label]) => {
+    const input = document.getElementById(id);
+    const light = document.querySelector(`.force-task-light[for="${id}"]`);
+    if (!input || !light) return;
+    const enabled = Boolean(input.checked);
+    light.classList.toggle('is-enabled', enabled);
+    light.setAttribute('aria-label', `${label}: ${enabled ? 'on' : 'off'}`);
+    light.title = `${label}: ${enabled ? 'on' : 'off'}`;
+  });
+}
+
+async function save_force_task_controls() {
+  const daily = document.getElementById('forceDailyToggle');
+  const visual = document.getElementById('forceVisualToggle');
+  await pywebview.api.set_force_tasks(
+    Boolean(daily && daily.checked),
+    Boolean(visual && visual.checked)
+  );
+}
+
 function open_settings_modal() {
   if (batchRunning) {
     show_toast('Settings are disabled while the batch is running.', 'warning');
@@ -1055,6 +1079,7 @@ function open_settings_modal() {
     const forceVisualToggle = document.getElementById('forceVisualToggle');
     if (forceDailyToggle) forceDailyToggle.checked = Boolean(force.force_daily_tasks);
     if (forceVisualToggle) forceVisualToggle.checked = Boolean(force.force_visual_search);
+    sync_force_task_controls();
 
     // LLM search-term generation.
     const cfg = llmConfig || {};
@@ -1424,12 +1449,7 @@ async function save_settings() {
     ));
 
     // Persist the force toggles (independent of the schedule slicing).
-    const forceDailyEl = document.getElementById('forceDailyToggle');
-    const forceVisualEl = document.getElementById('forceVisualToggle');
-    await pywebview.api.set_force_tasks(
-      Boolean(forceDailyEl && forceDailyEl.checked),
-      Boolean(forceVisualEl && forceVisualEl.checked)
-    );
+    await save_force_task_controls();
 
     // Persist LLM search-term config (independent of the schedule slicing).
     const llmToggleEl = document.getElementById('llmToggle');
@@ -1643,6 +1663,20 @@ document.addEventListener('DOMContentLoaded', function() {
   if (settingsCancel) settingsCancel.addEventListener('click', close_settings_modal);
   const settingsSave = document.getElementById('settingsSave');
   if (settingsSave) settingsSave.addEventListener('click', save_settings);
+
+  ['forceDailyToggle', 'forceVisualToggle'].forEach((id) => {
+    const toggle = document.getElementById(id);
+    if (!toggle) return;
+    toggle.addEventListener('change', async () => {
+      sync_force_task_controls();
+      try {
+        await save_force_task_controls();
+      } catch (err) {
+        console.error('Failed to save force task settings:', err);
+        show_toast('Could not save task override.', 'error');
+      }
+    });
+  });
 
   // LLM feature toggle dims/undims its config fields live.
   const llmToggle = document.getElementById('llmToggle');
