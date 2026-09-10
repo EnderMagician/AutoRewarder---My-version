@@ -390,6 +390,40 @@ input[type="checkbox"]:checked + .toggle-pill { border-color: var(--green); back
 input[type="checkbox"]:checked + .toggle-pill::after { transform: translateX(14px); }
 input[type="checkbox"]:focus-visible + .toggle-pill { box-shadow: var(--focus); }
 
+/* Task reruns use a warm bulb state instead of a position-based slider. */
+.force-task-light {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  background: var(--surface-muted);
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.force-task-light svg { width: 18px; height: 18px; }
+
+input[type="checkbox"]:checked + .force-task-light {
+  border-color: #ffe0a3;
+  color: #68451d;
+  background: #ffd687;
+  box-shadow: 0 0 13px rgba(255, 201, 103, 0.72);
+  animation: force-task-bulb-pulse 1.6s ease-in-out infinite;
+}
+
+input[type="checkbox"]:focus-visible + .force-task-light { box-shadow: var(--focus); }
+
+@keyframes force-task-bulb-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 201, 103, 0.42); }
+  50% { box-shadow: 0 0 18px rgba(255, 201, 103, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[type="checkbox"]:checked + .force-task-light { animation: none; }
+}
+
 /* Ender-eye browser visibility control: the only browser state control on
    the main surface. It swaps two pixel-inspired SVG layers rather than using
    a slider, with a still fallback for reduced-motion users. */
