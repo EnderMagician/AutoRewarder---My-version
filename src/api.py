@@ -464,9 +464,7 @@ class AutoRewarderAPI:
 
     def set_force_tasks(self, force_daily_tasks, force_visual_search):
         """Persist whether completed Daily Set and visual-search tasks may rerun."""
-        self.global_settings.set_force_tasks(
-            force_daily_tasks, force_visual_search
-        )
+        self.global_settings.set_force_tasks(force_daily_tasks, force_visual_search)
         self.log(
             f"Force daily tasks: {'ON' if force_daily_tasks else 'OFF'} - "
             f"Force visual search: {'ON' if force_visual_search else 'OFF'}"
@@ -526,7 +524,8 @@ class AutoRewarderAPI:
     def set_batch_include_daily_tasks(self, include_daily_tasks):
         """Persist the Daily tasks choice used by the next account batch."""
         try:
-            settings = self.global_settings.settings_for_update()
+            updater = getattr(self.global_settings, "settings_for_update", None)
+            settings = updater() if updater else self.global_settings.get_settings()
             settings["batch_include_daily_tasks"] = bool(include_daily_tasks)
             self.global_settings.save_settings(settings)
             return True
@@ -2950,7 +2949,9 @@ class AutoRewarderAPI:
         if force_visual_search:
             self.log("Force visual search is ON. Starting Visual Search task...")
         else:
-            self.log("Visual Search not completed today. Starting Visual Search task...")
+            self.log(
+                "Visual Search not completed today. Starting Visual Search task..."
+            )
 
         used_images = self.daily_set.get_used_visual_search_images()
 
@@ -2977,7 +2978,9 @@ class AutoRewarderAPI:
             if not success:
                 if credited is not True:
                     return False
-                self.log("Bing did not show results, but Rewards counted the visual search.")
+                self.log(
+                    "Bing did not show results, but Rewards counted the visual search."
+                )
             elif credited is False:
                 self.log("[WARNING] Rewards did not count the visual search.")
                 return False
