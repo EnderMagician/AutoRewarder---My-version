@@ -35,13 +35,15 @@ class _Api:
         self.account_manager = _Accounts()
         self.outcome = outcome
         self.calls = []
+        self.run_contexts = []
         self.history = None
         self.daily_set = None
         self.search_engine = None
         self.stats = None
 
-    def main(self, pc, mobile):
+    def main(self, pc, mobile, run_context="manual"):
         self.calls.append((pc, mobile))
+        self.run_contexts.append(run_context)
         return self.outcome
 
 
@@ -80,6 +82,7 @@ class CliRunnerTests(unittest.TestCase):
             cli._run_account(api, self.account)
 
         self.assertEqual([(11, 0)], api.calls)
+        self.assertEqual(["scheduled"], api.run_contexts)
 
 
 if __name__ == "__main__":

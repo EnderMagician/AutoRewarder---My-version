@@ -80,6 +80,9 @@ class _GlobalSettings:
     def save_settings(self, settings):
         self.data = dict(settings)
 
+    def get_manual_search_delay(self):
+        return (2.0, 5.0)
+
 
 class BatchRunnerTests(unittest.TestCase):
     def _api(self, outcomes):
@@ -267,14 +270,17 @@ class SingleAccountRunTests(unittest.TestCase):
         api.account_manager = _Accounts()
         api.run_coordinator = _Coordinator()
         api.run_origin = "interactive"
+        api.global_settings = _GlobalSettings()
         return api
 
     def test_single_account_uses_existing_pc_mobile_phases_and_daily_flag(self):
         api = self._api()
         phases = []
+        delays = []
 
-        def run_phase(mobile, count, do_daily_set):
+        def run_phase(mobile, count, do_daily_set, search_delay_range=None):
             phases.append((mobile, count, do_daily_set))
+            delays.append(search_delay_range)
             return {
                 "expected": count,
                 "completed": count,
@@ -288,13 +294,16 @@ class SingleAccountRunTests(unittest.TestCase):
 
         self.assertTrue(result["completed"])
         self.assertEqual([(False, 11, True), (True, 4, False)], phases)
+        self.assertEqual([(2.0, 5.0), (2.0, 5.0)], delays)
 
     def test_single_account_finishes_mobile_searches_after_daily_task_failure(self):
         api = self._api()
         phases = []
+        delays = []
 
-        def run_phase(mobile, count, do_daily_set):
+        def run_phase(mobile, count, do_daily_set, search_delay_range=None):
             phases.append((mobile, count, do_daily_set))
+            delays.append(search_delay_range)
             return {
                 "expected": count,
                 "completed": count,

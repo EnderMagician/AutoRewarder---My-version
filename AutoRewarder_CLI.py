@@ -41,15 +41,19 @@ def _iso_now():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def console_log(message):
+def console_log(message, account_label=None):
     """
     Print to stdout and append to the rotating background log file.
 
     Args:
         message (str): The message to log.
+        account_label (str): The label of the account to log.
     """
-    line = f"[{_iso_now()}] {message}"
+    account_prefix = f"[{account_label}] " if account_label else ""
+    line = f"[{_iso_now()}] {account_prefix}{message}"
+
     print(line)
+
     try:
         if (
             os.path.exists(LOG_FILE_PATH)
@@ -65,12 +69,28 @@ def console_log(message):
         print(f"[ERROR] Can't write log file: {e}")
 
 
+def make_account_logger(account_label):
+    """
+    Create a logger function that binds to a specific account label.
+
+    Args:
+        account_label (str): The label of the account to log.
+    Returns:
+        function: A logging function that automatically includes the account label.
+    """
+
+    def account_log(message):
+        console_log(message, account_label)
+
+    return account_log
+
+
 # ---------------------------------------------------------------------------
 # Run helpers
 # ---------------------------------------------------------------------------
 
 
-def _run_once(api, pc, mobile):
+def _run_once(api, pc, mobile, account_log):
     """
     Single burst: PC then Mobile, all in one go.
 
@@ -78,16 +98,17 @@ def _run_once(api, pc, mobile):
         api: AutoRewarderAPI instance (must already be headless-configured)
         pc: number of PC queries to run
         mobile: number of Mobile queries to run
+        account_log: logger function for the current account
     """
-    console_log(f"Single run: PC={pc}, Mobile={mobile}")
+    account_log(f"Single run: PC={pc}, Mobile={mobile}")
     try:
-        return api.main(int(pc), int(mobile))
+        return api.main(int(pc), int(mobile), run_context="scheduled")
     except Exception as e:
-        console_log(f"[ERROR] Run failed: {e}")
+        account_log(f"[ERROR] Run failed: {e}")
         return {"completed": False, "stopped": False, "error": str(e)}
 
 
-def _run_scheduled(api, pc, mobile, duration_hours, queries_per_hour):
+def _run_scheduled(api, pc, mobile, duration_hours, queries_per_hour, account_log):
     """
     Delegate advanced pacing to the single-account API pipeline.
 
@@ -102,11 +123,11 @@ def _run_scheduled(api, pc, mobile, duration_hours, queries_per_hour):
         duration_hours: how many hours to spread the queries across
         queries_per_hour: target queries per hour (overrides duration_hours if > 0)
     """
-    console_log(
+    account_log(
         f"Scheduled run: PC={pc}, Mobile={mobile} over {duration_hours}h "
         f"(qph={queries_per_hour})"
     )
-    return _run_once(api, pc, mobile)
+    return _run_once(api, pc, mobile, account_log)
 
 
 # ---------------------------------------------------------------------------
@@ -191,8 +212,10 @@ def _run_account(api, acc, pc_override=None, mobile_override=None, force=False):
     aid = acc["id"]
     label = acc["label"]
 
+    account_log = make_account_logger(label)
+
     if not acc["first_setup_done"]:
-        console_log(f"Skipping '{label}': First Setup not completed.")
+        account_log(f"Skipping '{label}': First Setup not completed.")
         return False
 
     meta = AccountMetaManager(aid)
@@ -200,11 +223,11 @@ def _run_account(api, acc, pc_override=None, mobile_override=None, force=False):
 
     if pc_override is None and mobile_override is None:
         if not sched.get("enabled"):
-            console_log(f"Skipping '{label}': schedule disabled.")
+            account_log(f"Skipping '{label}': schedule disabled.")
             return False
         today = date.today().isoformat()
         if not force and sched.get("last_triggered_date") == today:
-            console_log(f"Skipping '{label}': already triggered today.")
+            account_log(f"Skipping '{label}': already triggered today.")
             return False
 
     pc = int(pc_override if pc_override is not None else sched.get("queries_pc", 0))
@@ -215,33 +238,37 @@ def _run_account(api, acc, pc_override=None, mobile_override=None, force=False):
     )
 
     if pc + mobile <= 0:
-        console_log(f"Skipping '{label}': both PC and Mobile counts are 0.")
+        account_log(f"Skipping '{label}': both PC and Mobile counts are 0.")
         return False
 
     # Make this the current account so api.main() targets it.
     if api.account_manager.current_id() != aid:
-        console_log(f"Switching to account '{label}'.")
+        account_log(f"Switching to account '{label}'.")
         api.account_manager.select(aid)
         api._rebuild_account_context()
-        # Keep logger rebound after context rebuild.
-        if api.history is not None:
-            api.history._logger = console_log
-        if api.daily_set is not None:
-            api.daily_set.logger = console_log
-        if api.search_engine is not None:
-            api.search_engine._logger = console_log
-        if api.stats is not None:
-            api.stats._logger = console_log
+
+    api.log = account_log
+    api._safe_log = account_log
+
+    # Keep logger rebound after context rebuild.
+    if api.history is not None:
+        api.history._logger = account_log
+    if api.daily_set is not None:
+        api.daily_set.logger = account_log
+    if api.search_engine is not None:
+        api.search_engine._logger = account_log
+    if api.stats is not None:
+        api.stats._logger = account_log
 
     # AutoRewarderAPI reads this account's own schedule and handles Advanced
     # Scheduling internally. It writes last_triggered_date only after the
     # complete outcome, so interrupted runs remain eligible for a retry.
-    outcome = _run_once(api, pc, mobile)
+    outcome = _run_once(api, pc, mobile, account_log)
     if not outcome.get("completed"):
         if outcome.get("stopped"):
-            console_log(f"Scheduled run for '{label}' stopped before completion.")
+            account_log(f"Scheduled run for '{label}' stopped before completion.")
         else:
-            console_log(
+            account_log(
                 f"[ERROR] Scheduled run for '{label}' incomplete: "
                 f"{outcome.get('error') or 'unknown error'}"
             )
