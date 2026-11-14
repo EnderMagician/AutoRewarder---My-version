@@ -670,6 +670,7 @@ select:focus { border-color: var(--blue); outline: none; box-shadow: var(--focus
 .llm-fields[hidden] { display: none; }
 .form-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .form-field { display: grid; gap: 5px; min-width: 0; margin-bottom: 10px; }
+.form-field[hidden] { display: none; }
 .form-field > label { color: var(--muted-strong); font-size: 10px; font-weight: 700; }
 
 .schedule-accounts-list { display: grid; gap: 7px; max-height: 355px; overflow: auto; }

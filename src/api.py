@@ -282,7 +282,7 @@ class AutoRewarderAPI:
             width=700,
             height=500,
             resizable=True,
-            background_color="#0d1117",
+            background_color="#080c16",
             text_select=True,
         )
 

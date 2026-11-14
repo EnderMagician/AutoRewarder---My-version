@@ -1049,7 +1049,8 @@ function open_settings_modal() {
     pywebview.api.get_close_to_tray(),
     pywebview.api.get_llm_config(),
     pywebview.api.get_force_tasks(),
-  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks]) => {
+    pywebview.api.get_manual_search_delay(),
+  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks, searchDelay]) => {
     render_schedule_cards(schedules || []);
 
     // Start-with-Windows toggle — disable row on unsupported OS.
@@ -1081,6 +1082,13 @@ function open_settings_modal() {
     if (forceVisualToggle) forceVisualToggle.checked = Boolean(force.force_visual_search);
     sync_force_task_controls();
 
+    // Manual search pace — fall back to the backend default range.
+    const delay = searchDelay || {};
+    const delayMin = document.getElementById('searchDelayMin');
+    const delayMax = document.getElementById('searchDelayMax');
+    if (delayMin) delayMin.value = Number.isFinite(delay.minimum) ? delay.minimum : 4;
+    if (delayMax) delayMax.value = Number.isFinite(delay.maximum) ? delay.maximum : 10;
+
     // LLM search-term generation.
     const cfg = llmConfig || {};
     const llmToggle = document.getElementById('llmToggle');
@@ -1093,6 +1101,8 @@ function open_settings_modal() {
     if (providerSel && cfg.llm_provider) providerSel.value = cfg.llm_provider;
     if (modelInput) modelInput.value = cfg.llm_model || '';
     if (keyInput) keyInput.value = cfg.llm_api_key || '';
+    const baseUrlInput = document.getElementById('llmBaseUrl');
+    if (baseUrlInput) baseUrlInput.value = cfg.llm_base_url || '';
     if (localeInput) localeInput.value = cfg.search_locale || 'auto';
     if (localeHint) {
       const eff = cfg.effective_locale || 'en-US';
@@ -1119,6 +1129,20 @@ function apply_llm_field_state() {
   const fields = document.getElementById('llm_fields');
   if (!fields) return;
   fields.classList.toggle('dim', !(toggle && toggle.checked));
+  apply_llm_provider_state();
+}
+
+// The Base URL field only applies to self-hosted / OpenAI-compatible endpoints.
+function apply_llm_provider_state() {
+  const providerSel = document.getElementById('llmProvider');
+  const baseUrlField = document.getElementById('llm_base_url_field');
+  if (!providerSel || !baseUrlField) return;
+  baseUrlField.hidden = providerSel.value !== 'openai-compatible';
+}
+
+function open_background_logs() {
+  if (!window.pywebview || !pywebview.api || !pywebview.api.open_background_logs_window) return;
+  pywebview.api.open_background_logs_window();
 }
 
 function render_schedule_cards(schedules) {
@@ -1441,6 +1465,28 @@ async function save_settings() {
     });
   }
 
+  // Manual search pace (seconds). Mirrors the backend's bounds.
+  const delayMinValue = parseFloat(document.getElementById('searchDelayMin').value);
+  const delayMaxValue = parseFloat(document.getElementById('searchDelayMax').value);
+  if (!Number.isFinite(delayMinValue) || !Number.isFinite(delayMaxValue)
+      || delayMinValue < 0 || delayMaxValue > 1800 || delayMinValue > delayMaxValue) {
+    show_toast('Search delay must be 0–1800 s, with minimum ≤ maximum.', 'warning');
+    return;
+  }
+
+  const providerValue = document.getElementById('llmProvider').value;
+  const baseUrlValue = document.getElementById('llmBaseUrl').value.trim();
+  const llmEnabled = Boolean(document.getElementById('llmToggle').checked);
+  if (llmEnabled && providerValue === 'openai-compatible' && !/^https?:\/\/\S+$/i.test(baseUrlValue)) {
+    show_toast('Enter the Base URL of your OpenAI-compatible endpoint (http:// or https://).', 'warning');
+    return;
+  }
+  if (llmEnabled && providerValue === 'openai-compatible'
+      && !document.getElementById('llmModel').value.trim()) {
+    show_toast('OpenAI-compatible endpoints need a model name.', 'warning');
+    return;
+  }
+
   try {
     // Persist each account's dashboard choice first (independent of the
     // schedule payload; kept out of the results[] slicing below).
@@ -1452,14 +1498,19 @@ async function save_settings() {
     await save_force_task_controls();
 
     // Persist LLM search-term config (independent of the schedule slicing).
-    const llmToggleEl = document.getElementById('llmToggle');
     await pywebview.api.set_llm_config(
-      Boolean(llmToggleEl && llmToggleEl.checked),
-      document.getElementById('llmProvider').value,
+      llmEnabled,
+      providerValue,
       document.getElementById('llmModel').value,
       document.getElementById('llmApiKey').value,
-      document.getElementById('llmLocale').value
+      document.getElementById('llmLocale').value,
+      baseUrlValue
     );
+
+    const delaySaved = await pywebview.api.set_manual_search_delay(delayMinValue, delayMaxValue);
+    if (delaySaved === false) {
+      show_toast('Could not save the search delay.', 'error');
+    }
 
     const scheduleCalls = payloads.map(p =>
       pywebview.api.set_schedule(p.id, p.payload)
@@ -1681,6 +1732,12 @@ document.addEventListener('DOMContentLoaded', function() {
   // LLM feature toggle dims/undims its config fields live.
   const llmToggle = document.getElementById('llmToggle');
   if (llmToggle) llmToggle.addEventListener('change', apply_llm_field_state);
+  const llmProvider = document.getElementById('llmProvider');
+  if (llmProvider) llmProvider.addEventListener('change', apply_llm_provider_state);
+
+  // Header background logs button.
+  const logsBtn = document.getElementById('logsBtn');
+  if (logsBtn) logsBtn.addEventListener('click', open_background_logs);
   const settingsModal = document.getElementById('settings_modal');
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {

@@ -22,6 +22,12 @@
       </div>
 
       <div class="header-actions">
+        <button id="logsBtn" class="icon-ghost" type="button" aria-label="Background logs" title="Background logs">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 17l6-6-6-6"></path>
+            <path d="M12 19h8"></path>
+          </svg>
+        </button>
         <button id="manageBtn" class="icon-ghost" type="button" aria-label="Manage accounts" title="Manage accounts">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -264,6 +270,21 @@
         </section>
 
         <section class="settings-group">
+          <div class="settings-group-title">Search pace</div>
+          <p class="settings-group-hint">Random wait between searches on a manual run. Scheduled runs and Advanced Scheduling keep the default 4–10 s.</p>
+          <div class="form-grid-2">
+            <div class="form-field">
+              <label for="searchDelayMin">Minimum delay (seconds)</label>
+              <input type="number" id="searchDelayMin" min="0" max="1800" step="0.5" inputmode="decimal" placeholder="4">
+            </div>
+            <div class="form-field">
+              <label for="searchDelayMax">Maximum delay (seconds)</label>
+              <input type="number" id="searchDelayMax" min="0" max="1800" step="0.5" inputmode="decimal" placeholder="10">
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-group">
           <div class="settings-group-title">Search terms</div>
           <label class="settings-row">
             <div class="settings-row-text">
@@ -284,12 +305,17 @@
                   <option value="openai">OpenAI</option>
                   <option value="anthropic">Anthropic</option>
                   <option value="gemini">Google Gemini</option>
+                  <option value="openai-compatible">OpenAI-compatible</option>
                 </select>
               </div>
               <div class="form-field">
                 <label for="llmModel">Model</label>
                 <input type="text" id="llmModel" placeholder="Default for provider" autocomplete="off" spellcheck="false">
               </div>
+            </div>
+            <div class="form-field" id="llm_base_url_field" hidden>
+              <label for="llmBaseUrl">Base URL</label>
+              <input type="url" id="llmBaseUrl" placeholder="http://localhost:11434/v1" autocomplete="off" spellcheck="false">
             </div>
             <div class="form-grid-2">
               <div class="form-field">
