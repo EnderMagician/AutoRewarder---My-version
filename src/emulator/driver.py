@@ -24,13 +24,19 @@ class DriverManager:
         self.profile_path = profile_path
         self.hide_browser = hide_browser
 
-    # Realistic iPhone UA so Microsoft Rewards credits the searches as mobile.
+    # Safari on an iOS 26 iPhone, so Microsoft Rewards credits the searches
+    # as mobile. From iOS 26 on, Safari freezes the OS token at 18_6 and only
+    # `Version/` tracks the real release, so "iPhone OS 26_0" would itself
+    # look wrong. This is the string iOS 26.0 shipped with.
     MOBILE_USER_AGENT = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 "
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 "
         "Mobile/15E148 Safari/604.1"
     )
-    MOBILE_WINDOW_SIZE = "412,915"
+    # CSS viewport of a 6.1" iPhone (15 / 16) at 3x. The old 412x915 is an
+    # Android size that no iPhone has.
+    MOBILE_VIEWPORT = (393, 852)
+    MOBILE_WINDOW_SIZE = f"{MOBILE_VIEWPORT[0]},{MOBILE_VIEWPORT[1]}"
     DESKTOP_WINDOW_SIZE = "1920,1080"
 
     def setup_driver(self, headless=None, disable_identity=False, mobile=False):
@@ -112,24 +118,21 @@ class DriverManager:
                 _driver.execute_cdp_cmd(
                     "Emulation.setDeviceMetricsOverride",
                     {
-                        "width": 412,
-                        "height": 915,
+                        "width": self.MOBILE_VIEWPORT[0],
+                        "height": self.MOBILE_VIEWPORT[1],
                         "deviceScaleFactor": 3,
                         "mobile": True,
                     },
                 )
+                # No userAgentMetadata on purpose: Safari doesn't implement
+                # User-Agent Client Hints, so a real iPhone sends no
+                # Sec-CH-UA-* headers and has no navigator.userAgentData.
+                # Leaving the metadata out makes Edge stop sending them too.
                 _driver.execute_cdp_cmd(
                     "Emulation.setUserAgentOverride",
                     {
                         "userAgent": self.MOBILE_USER_AGENT,
                         "platform": "iPhone",
-                        "userAgentMetadata": {
-                            "platform": "iOS",
-                            "platformVersion": "17.2.1",
-                            "architecture": "",
-                            "model": "iPhone",
-                            "mobile": True,
-                        },
                     },
                 )
             except Exception:
