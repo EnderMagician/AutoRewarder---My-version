@@ -1,13 +1,13 @@
 [Setup]
 AppName=AutoRewarder
 AppId=AutoRewarder
-AppVersion=4.3.1
+AppVersion=4.4.1
 AppPublisher=Sino Safarov
 AppPublisherURL=https://github.com/safarsin
 DefaultDirName={commonpf}\AutoRewarder
 DefaultGroupName=AutoRewarder
 OutputDir=dist
-OutputBaseFilename=AutoRewarder-Setup-v4.3.1
+OutputBaseFilename=AutoRewarder-Setup-v4.4.1
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=admin
