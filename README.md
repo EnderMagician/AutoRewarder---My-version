@@ -41,10 +41,10 @@ Built with a robust Python/Selenium backend, it offers two modes of operation: a
 ## Installation
 
 **Windows (Installer):**
-Download `AutoRewarder-Setup.exe` from the [latest release](https://github.com/safarsin/AutoRewarder/releases/latest) and run it. The installer will verify all dependencies and install the app for you.
+Download `AutoRewarder-Setup-<version>.exe` from the [latest release](https://github.com/EnderMagician/AutoRewarder---My-version/releases/latest) and run it. The installer will verify all dependencies and install the app for you.
 
 **Windows & Linux (Portable):**
-Download the archive for your platform from the [latest release](https://github.com/safarsin/AutoRewarder/releases/latest):
+This fork's releases ship the Windows installer only. The portable archives below come from the [original project's releases](https://github.com/safarsin/AutoRewarder/releases/latest), which don't include this fork's changes; to run this fork's code on Linux, use the [source setup](#development-setup-for-developers).
 - **Windows**: `AutoRewarder-windows.zip` (includes the `config` folder for portable use)
 - **Linux**: `AutoRewarder-linux.tar.gz`
 
@@ -197,7 +197,11 @@ For detailed guide, see [USER_GUIDE.md](USER_GUIDE.md)
 
 ## Development Setup (For Developers)
 
-1. Clone the repository.
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/EnderMagician/AutoRewarder---My-version.git
+    cd AutoRewarder---My-version
+    ```
 2. Create a virtual environment:
   - Windows:
       ```bash
@@ -453,6 +457,8 @@ You are responsible for your own usage.
 ---
 
 ## Contact
+
+This is a fork of [safarsin/AutoRewarder](https://github.com/safarsin/AutoRewarder). Its Issues and Discussions are turned off, so use the original project's:
 
 - **[Issues](https://github.com/safarsin/AutoRewarder/issues)** — for bug reports, feature requests, and errors.
 - **[Discussions](https://github.com/safarsin/AutoRewarder/discussions)** — for questions, ideas, and general help.

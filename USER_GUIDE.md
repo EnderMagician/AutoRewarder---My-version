@@ -482,7 +482,7 @@ A: Closing the window sends AutoRewarder to the system tray so it can keep runni
 
 **Q: Can I run this on Mac or Linux?**
 
-A: AutoRewarder officially supports Windows (installer and portable) and Linux (standalone executable). You can download the pre-built archives for both platforms from the [Releases page](https://github.com/safarsin/AutoRewarder/releases/latest). macOS is not officially supported.
+A: AutoRewarder officially supports Windows (installer and portable) and Linux (standalone executable). This fork's [Releases page](https://github.com/EnderMagician/AutoRewarder---My-version/releases/latest) has the Windows installer; the portable Windows and Linux archives are on the [original project's Releases page](https://github.com/safarsin/AutoRewarder/releases/latest) and don't include this fork's changes. macOS is not officially supported.
 
 ---
 
