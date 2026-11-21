@@ -122,6 +122,73 @@ VISUAL_SEARCH_INPUT_LOCATORS = (
 # (/search?q=...&bcid=...&FORM=SBIIRP), hence several markers.
 VISUAL_SEARCH_RESULT_URL_MARKERS = ("form=sbi", "iss=sbi", "bcid=", "view=detailv2")
 
+BING_HOME_URL = "https://www.bing.com"
+
+# Random pauses between searches, on top of coffee breaks:
+# (chance per search, shortest, longest) in seconds. A message, a phone
+# call, a look at something else; they are what make the gaps irregular.
+SHORT_SEARCH_PAUSE = (0.10, 15.0, 60.0)
+LONG_SEARCH_PAUSE = (0.03, 90.0, 240.0)
+
+# Chance of typing the next search into the results page's own search box
+# (as people refine a search) instead of going back to the homepage.
+REFINE_FROM_RESULTS = 0.6
+
+# Chance of opening one of the top results and reading it before moving on.
+OPEN_RESULT_CHANCE = 0.12
+# Top organic results on a Bing results page, and how likely each rank is
+# to be the one opened (people mostly open the first couple).
+RESULT_LINK_SELECTOR = "#b_results li.b_algo h2 a"
+RESULT_RANK_WEIGHTS = (40, 25, 15, 10, 6, 4)
+
+# Coffee breaks: after 4-9 searches (80%) a 15-30 s break, otherwise after
+# 10-15 searches a 45-90 s one.
+COFFEE_BREAK_SHORT = (0.8, (4, 9), (15.0, 30.0))
+COFFEE_BREAK_LONG = ((10, 15), (45.0, 90.0))
+
+# Average time one search takes apart from the configured delay and the
+# pauses: clicking and typing the query (~7 s), the results loading (~3 s),
+# reading or switching tabs (~8 s), the wait afterwards (~3 s) and the
+# occasional opened result (~3 s on average).
+_SEARCH_WORK_SECONDS = 24.0
+
+
+def search_delay(delay_min, delay_max):
+    """
+    Pick the wait before a search: anywhere in the range, mostly the lower part.
+
+    A triangular draw peaking at a third of the range: the configured
+    bounds still hold, but the gaps don't spread evenly the way a uniform
+    draw does.
+    """
+    low, high = sorted((float(delay_min), float(delay_max)))
+    return random.triangular(low, high, low + (high - low) * 0.35)
+
+
+def expected_search_seconds(search_delay_range=(4.0, 10.0), random_pauses=True):
+    """
+    Estimate the average seconds one search takes, including its share of
+    coffee breaks and random pauses. Used for time-left estimates before any
+    real search has been timed.
+    """
+    low, high = sorted(float(v) for v in search_delay_range)
+    delay = (low + high + (low + (high - low) * 0.35)) / 3
+
+    share, short_every, short_len = COFFEE_BREAK_SHORT
+    long_every, long_len = COFFEE_BREAK_LONG
+    searches_per_break = (
+        share * sum(short_every) / 2 + (1 - share) * sum(long_every) / 2
+    )
+    break_length = share * sum(short_len) / 2 + (1 - share) * sum(long_len) / 2
+    coffee = break_length / searches_per_break
+
+    pauses = 0.0
+    if random_pauses:
+        for chance, shortest, longest in (SHORT_SEARCH_PAUSE, LONG_SEARCH_PAUSE):
+            pauses += chance * (shortest + longest) / 2
+
+    return delay + _SEARCH_WORK_SECONDS + coffee + pauses
+
 
 class SearchEngine:
     """
@@ -139,6 +206,11 @@ class SearchEngine:
 
         self._logger = logger
         self._history = history
+        # Whether HumanBehavior draws its debug cursor into the page, and
+        # whether searches get random pauses between them; both come from
+        # the global settings.
+        self.show_cursor = False
+        self.random_pauses = True
         # Surface the last successful search ran on, so the caller can ask for
         # the other one when Rewards doesn't credit that one.
         self.last_search_url = None
@@ -206,11 +278,12 @@ class SearchEngine:
         """
 
         # 80% of the time, take a break after 4-9 searches
-        if random.random() < 0.8:
-            return random.randint(4, 9)
+        share, short_every, _ = COFFEE_BREAK_SHORT
+        if random.random() < share:
+            return random.randint(*short_every)
         # 20% of the time, take a break after 10-15 searches
         else:
-            return random.randint(10, 15)
+            return random.randint(*COFFEE_BREAK_LONG[0])
 
     def perform_searches(
         self,
@@ -219,9 +292,16 @@ class SearchEngine:
         mobile=False,
         stop_event=None,
         search_delay_range=(4.0, 10.0),
+        on_search_done=None,
     ):
         """
         Perform searches on Bing using Selenium WebDriver with human-like behavior.
+
+        Each search: an occasional random pause, then either the homepage or
+        the current results page's own search box, the configured delay,
+        a coffee break every few searches, a click into the search box, the
+        query typed at a human pace, then reading the results (scrolling,
+        switching tabs, sometimes opening a result).
 
         Args:
             driver (WebDriver): An instance of Selenium WebDriver to control the browser.
@@ -230,22 +310,27 @@ class SearchEngine:
                 of mouse events — pair with a mobile-emulated driver.
             stop_event (threading.Event, optional): If provided and set, the
                 loop bails out at the next checkpoint and any in-progress
-                coffee break is interrupted immediately.
+                coffee break or pause is interrupted immediately.
             search_delay_range (tuple): A tuple specifying the range of delays (min, max)
                 to use for each search.
+            on_search_done (callable, optional): called with True/False after
+                each search attempt, for progress and time-left estimates.
 
         Returns:
             int: the number of searches that completed successfully (used by
                 the stats layer to record activity for this run).
         """
 
-        human = HumanBehavior(driver, show_cursor=True, mobile=mobile)
+        human = HumanBehavior(driver, show_cursor=self.show_cursor, mobile=mobile)
 
         delay_min, delay_max = search_delay_range
 
         next_coffee_break = self.get_coffee_break_count()
         searches_since_break = 0
         successful = 0
+        # True while the browser shows a web results page whose search box
+        # the next query can be typed into.
+        on_results = False
 
         self._log(f"Loaded {len(queries)} queries. Starting searches...")
         self._log(f"Next coffee break after {next_coffee_break} searches.")
@@ -255,11 +340,17 @@ class SearchEngine:
                 self._log("Stop requested — halting search loop.")
                 return successful
 
+            if i > 0 and self._random_pause(stop_event):
+                self._log("Stop requested during a pause — halting.")
+                return successful
+
+            succeeded = False
             try:
-                # Open Bing homepage
-                driver.get("https://www.bing.com")
+                if not on_results or random.random() >= REFINE_FROM_RESULTS:
+                    driver.get(BING_HOME_URL)
+                    on_results = False
                 # Random delay to mimic human behavior
-                time.sleep(random.uniform(delay_min, delay_max))
+                time.sleep(search_delay(delay_min, delay_max))
 
                 searches_since_break += 1
 
@@ -267,10 +358,10 @@ class SearchEngine:
                 if searches_since_break >= next_coffee_break:
 
                     if next_coffee_break > 9:
-                        pause_duration = random.uniform(45, 90)
+                        pause_duration = random.uniform(*COFFEE_BREAK_LONG[1])
                         self._log("Taking a big coffee break...")
                     else:
-                        pause_duration = random.uniform(15, 30)
+                        pause_duration = random.uniform(*COFFEE_BREAK_SHORT[2])
                         self._log("Taking a quick coffee break...")
 
                     self._log(
@@ -288,122 +379,39 @@ class SearchEngine:
                     searches_since_break = 0
                     self._log(f"Next coffee break after {next_coffee_break} searches.")
 
-                # Find the search box, clear it
-                search_box = driver.find_element(By.NAME, "q")
-                search_box.clear()
-
                 # Log the search query in log area
                 self._log(f"Search #{i + 1}: {query}")
 
-                # Type the query with human-like delays
-                human_typing(search_box, query)
-                search_box.send_keys(Keys.RETURN)  # Press Enter to search
+                self._enter_query(driver, human, query, mobile)
+                on_results = True
 
                 # Wait for result to load
                 time.sleep(random.uniform(2, 4))
 
-                tabs_config = [
-                    {"name": "All", "priority": 70, "id": None},
-                    {"name": "Images", "priority": 10, "id": "b-scopeListItem-images"},
-                    {"name": "Videos", "priority": 10, "id": "b-scopeListItem-video"},
-                    {"name": "News", "priority": 10, "id": "b-scopeListItem-news"},
-                ]
+                chosen_tab = self._browse_results(driver, human)
+                if chosen_tab == "All" and random.random() < OPEN_RESULT_CHANCE:
+                    self._read_a_result(driver, human)
 
-                weights = [tab["priority"] for tab in tabs_config]
-                chosen_tab = random.choices(tabs_config, weights=weights, k=1)[0]
-
-                if chosen_tab["name"] != "All":
-                    main_tab = driver.current_window_handle
-                    tab_element = None
-
-                    # Check if news tab exists, if it doesn't choose Images or Videos
-                    if chosen_tab["name"] == "News":
-                        try:
-                            xpath = f"//nav/ul/li[@id='{chosen_tab['id']}']/a"
-                            tab_element = driver.find_element(By.XPATH, xpath)
-                        except NoSuchElementException:
-                            chosen_tab = random.choice(tabs_config[1:3])
-
-                    self._log(f"Chosen behavior: Switch to {chosen_tab['name']}")
-                    try:
-                        # Find the tab element using its id
-                        if not tab_element:
-                            xpath = f"//nav/ul/li[@id='{chosen_tab['id']}']/a"
-                            tab_element = driver.find_element(By.XPATH, xpath)
-
-                        # Move mouse and click the tab
-                        human.click_element(tab_element)
-
-                        time.sleep(random.uniform(3, 6))
-
-                    except NoSuchElementException:
-                        self._log(
-                            f"[WARNING] Tab {chosen_tab['name']} not found. Staying on 'All'."
-                        )
-
-                        # Fallback to "All" if the chosen tab is not found
-                        chosen_tab["name"] = "All"
-
-                    except WebDriverException as e:
-                        short_error = str(e).split("\n")[0][:28]
-                        self._log(
-                            f"[WARNING] WebDriver error when switching to {chosen_tab['name']}: {short_error}."
-                        )
-                        self._log("Staying on 'All'.")
-
-                        chosen_tab["name"] = "All"
-
-                # Scroll the page to mimic human behavior
-                try:
-                    if chosen_tab["name"] == "All":
-                        human.scroll_page()
-                except WebDriverException as e:
-                    short_error = str(e).split("\n")[0][:28]
-                    self._log(
-                        f"[WARNING] WebDriver error when scrolling: {short_error}. Continuing."
-                    )
-
-                # Pause after scrolling
-                time.sleep(random.uniform(2, 4))
-
-                # Close all tabs other than main
-                if chosen_tab["name"] != "All":
-                    new_tabs = [tab for tab in driver.window_handles if tab != main_tab]
-                    for tab in new_tabs:
-                        try:
-                            driver.switch_to.window(tab)
-                            hostname = (
-                                (urlparse(driver.current_url).hostname or "")
-                                .lower()
-                                .rstrip(".")
-                            )
-                            if hostname != "bing.com" and not hostname.endswith(
-                                ".bing.com"
-                            ):
-                                continue
-                            driver.close()
-                        except WebDriverException as e:
-                            short_error = str(e).split("\n")[0][:28]
-                            self._log(
-                                f"[WARNING] WebDriver error when closing tab: {short_error}. Continuing."
-                            )
-
-                    if main_tab in driver.window_handles:
-                        driver.switch_to.window(main_tab)
+                # Only a web results page is a place to refine from: the
+                # Images, Videos and News pages search their own vertical.
+                on_results = chosen_tab == "All" and self._on_bing_results(driver)
 
                 # Add to history.json
                 self._add_to_history(query, "Success")
                 successful += 1
+                succeeded = True
 
             except NoSuchElementException:
                 if stop_event is not None and stop_event.is_set():
                     return successful
+                on_results = False
                 self._log(f"[ERROR] Search box not found on attempt #{i+1}")
                 self._add_to_history(query, "[ERROR] Search box not found")
 
             except WebDriverException as e:
                 if stop_event is not None and stop_event.is_set():
                     return successful
+                on_results = False
                 short_error = str(e).split("\n")[0][:28]
                 self._log(f"[ERROR] WebDriver error on attempt #{i+1}: {short_error}")
                 self._add_to_history(query, f"[ERROR] WebDriver Error: {short_error}")
@@ -411,10 +419,240 @@ class SearchEngine:
             except Exception as e:
                 if stop_event is not None and stop_event.is_set():
                     return successful
+                on_results = False
                 self._log(f"[ERROR] Unknown error on attempt #{i+1}: {e}")
                 self._add_to_history(query, f"[ERROR] Unknown Error: {str(e)[:50]}")
 
+            if on_search_done is not None:
+                try:
+                    on_search_done(succeeded)
+                except Exception:
+                    pass
+
         return successful
+
+    def _random_pause(self, stop_event):
+        """
+        Sometimes wait a while before the next search, apart from coffee breaks.
+
+        Returns:
+            bool: True if Stop was pressed during the pause.
+        """
+        if not self.random_pauses:
+            return False
+        roll = random.random()
+        if roll < LONG_SEARCH_PAUSE[0]:
+            label, (_, shortest, longest) = "Longer pause", LONG_SEARCH_PAUSE
+        elif roll < LONG_SEARCH_PAUSE[0] + SHORT_SEARCH_PAUSE[0]:
+            label, (_, shortest, longest) = "Short pause", SHORT_SEARCH_PAUSE
+        else:
+            return False
+
+        seconds = random.uniform(shortest, longest)
+        self._log(
+            f"{label}: sleeping for {seconds:.1f} seconds before the next search."
+        )
+        if stop_event is not None:
+            return stop_event.wait(seconds)
+        time.sleep(seconds)
+        return False
+
+    def _enter_query(self, driver, human, query, mobile):
+        """
+        Click into the search box, replace what's there, type, press Enter.
+
+        Raises:
+            NoSuchElementException: if the page has no search box.
+        """
+        search_box = driver.find_element(By.NAME, "q")
+        human.click_element(search_box)
+        human.pause(0.15, 0.5)
+
+        # Clicking can move focus to the real input (Bing's mobile results
+        # page opens a search overlay); type wherever the caret actually is.
+        try:
+            active = driver.switch_to.active_element
+            if active.get_attribute("name") == "q" or active.tag_name in (
+                "input",
+                "textarea",
+            ):
+                search_box = active
+        except WebDriverException:
+            pass
+
+        if search_box.get_attribute("value"):
+            if mobile:
+                search_box.clear()
+            else:
+                # Select the old query; the first key typed replaces it.
+                search_box.send_keys(Keys.CONTROL, "a")
+                human.pause(0.1, 0.3)
+
+        human.type_text(search_box, query)
+        human.pause(0.2, 0.9)
+        search_box.send_keys(Keys.RETURN)  # Press Enter to search
+
+    def _browse_results(self, driver, human):
+        """
+        Look through the results: stay on All and scroll, or try another tab.
+
+        Returns:
+            str: the tab the browser ended up on ("All", "Images", ...).
+        """
+        tabs_config = [
+            {"name": "All", "priority": 70, "id": None},
+            {"name": "Images", "priority": 10, "id": "b-scopeListItem-images"},
+            {"name": "Videos", "priority": 10, "id": "b-scopeListItem-video"},
+            {"name": "News", "priority": 10, "id": "b-scopeListItem-news"},
+        ]
+
+        weights = [tab["priority"] for tab in tabs_config]
+        chosen_tab = dict(random.choices(tabs_config, weights=weights, k=1)[0])
+        main_tab = driver.current_window_handle
+
+        if chosen_tab["name"] != "All":
+            tab_element = None
+
+            # Check if news tab exists, if it doesn't choose Images or Videos
+            if chosen_tab["name"] == "News":
+                try:
+                    xpath = f"//nav/ul/li[@id='{chosen_tab['id']}']/a"
+                    tab_element = driver.find_element(By.XPATH, xpath)
+                except NoSuchElementException:
+                    chosen_tab = dict(random.choice(tabs_config[1:3]))
+
+            self._log(f"Chosen behavior: Switch to {chosen_tab['name']}")
+            try:
+                # Find the tab element using its id
+                if not tab_element:
+                    xpath = f"//nav/ul/li[@id='{chosen_tab['id']}']/a"
+                    tab_element = driver.find_element(By.XPATH, xpath)
+
+                # Move mouse and click the tab
+                human.click_element(tab_element)
+
+                human.pause(3, 6)
+
+            except NoSuchElementException:
+                self._log(
+                    f"[WARNING] Tab {chosen_tab['name']} not found. Staying on 'All'."
+                )
+
+                # Fallback to "All" if the chosen tab is not found
+                chosen_tab["name"] = "All"
+
+            except WebDriverException as e:
+                short_error = str(e).split("\n")[0][:28]
+                self._log(
+                    f"[WARNING] WebDriver error when switching to {chosen_tab['name']}: {short_error}."
+                )
+                self._log("Staying on 'All'.")
+
+                chosen_tab["name"] = "All"
+
+        # Scroll the page to mimic human behavior
+        try:
+            if chosen_tab["name"] == "All":
+                human.scroll_page()
+        except WebDriverException as e:
+            short_error = str(e).split("\n")[0][:28]
+            self._log(
+                f"[WARNING] WebDriver error when scrolling: {short_error}. Continuing."
+            )
+
+        # Pause after scrolling
+        human.pause(2, 4)
+
+        # Close all tabs other than main
+        if chosen_tab["name"] != "All":
+            self._close_extra_bing_tabs(driver, main_tab)
+
+        return chosen_tab["name"]
+
+    def _close_extra_bing_tabs(self, driver, main_tab):
+        """Close Bing tabs a click opened, and return to `main_tab`."""
+        new_tabs = [tab for tab in driver.window_handles if tab != main_tab]
+        for tab in new_tabs:
+            try:
+                driver.switch_to.window(tab)
+                hostname = (
+                    (urlparse(driver.current_url).hostname or "").lower().rstrip(".")
+                )
+                if hostname != "bing.com" and not hostname.endswith(".bing.com"):
+                    continue
+                driver.close()
+            except WebDriverException as e:
+                short_error = str(e).split("\n")[0][:28]
+                self._log(
+                    f"[WARNING] WebDriver error when closing tab: {short_error}. Continuing."
+                )
+
+        if main_tab in driver.window_handles:
+            driver.switch_to.window(main_tab)
+
+    def _read_a_result(self, driver, human):
+        """
+        Open one of the top results, read it for a while, then come back.
+
+        Best effort: any failure just leaves the browser where it is, and the
+        next search starts from the homepage if it isn't on Bing results.
+        """
+        try:
+            links = [
+                link
+                for link in driver.find_elements(By.CSS_SELECTOR, RESULT_LINK_SELECTOR)[
+                    : len(RESULT_RANK_WEIGHTS)
+                ]
+                if link.is_displayed()
+            ]
+        except WebDriverException:
+            return
+        if not links:
+            return
+
+        link = random.choices(links, weights=RESULT_RANK_WEIGHTS[: len(links)])[0]
+        main_tab = driver.current_window_handle
+        before = set(driver.window_handles)
+        try:
+            title = (link.text or "").strip()[:60]
+            self._log(f"Opening a result: {title or 'top result'}")
+            human.click_element(link)
+            human.pause(2.5, 4.5)
+
+            opened = [tab for tab in driver.window_handles if tab not in before]
+            if opened:
+                driver.switch_to.window(opened[0])
+
+            if random.random() < 0.7:
+                human.scroll_page()
+            else:
+                human.pause(5, 15)
+
+            if opened:
+                driver.close()
+                driver.switch_to.window(main_tab)
+            else:
+                driver.back()
+            human.pause(1.5, 3)
+        except WebDriverException as e:
+            short_error = str(e).split("\n")[0][:28]
+            self._log(f"[WARNING] Couldn't read the result: {short_error}. Continuing.")
+            try:
+                if main_tab in driver.window_handles:
+                    driver.switch_to.window(main_tab)
+            except WebDriverException:
+                pass
+
+    def _on_bing_results(self, driver):
+        """True when the current page is a Bing web results page."""
+        try:
+            parsed = urlparse(driver.current_url)
+        except WebDriverException:
+            return False
+        host = (parsed.hostname or "").lower()
+        return (
+            host == "bing.com" or host.endswith(".bing.com")
+        ) and parsed.path.startswith("/search")
 
     def _find_visual_search_element(
         self,
@@ -1073,7 +1311,7 @@ class SearchEngine:
             self._log("Skipping visual search because Stop was requested.")
             return False
 
-        human = HumanBehavior(driver, show_cursor=True, mobile=False)
+        human = HumanBehavior(driver, show_cursor=self.show_cursor, mobile=False)
         step = "opening Bing"
 
         mission_url = entry_url or REWARDS_VISUAL_SEARCH_URL

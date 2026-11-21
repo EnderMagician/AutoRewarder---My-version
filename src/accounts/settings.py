@@ -159,6 +159,12 @@ class GlobalSettingsManager:
             # detected_locale (navigator.language) or OS detection.
             "search_locale": "auto",
             "detected_locale": "",  # filled by the GUI from navigator.language
+            # Occasional extra pauses between searches (15-60 s, sometimes
+            # 1.5-4 min), on top of the coffee breaks.
+            "random_search_pauses": True,
+            # Draw the red/green debug cursor into pages. It is a <div> the
+            # page's own scripts can see, so it is off by default.
+            "show_cursor": False,
             # Delay range for normal manual searches
             "manual_search_delay_min": 4.0,
             "manual_search_delay_max": 10.0,
@@ -358,6 +364,21 @@ class GlobalSettingsManager:
         self.save_settings(settings)
 
         return True
+
+    def get_behavior_options(self):
+        """Return {random_search_pauses, show_cursor} as booleans."""
+        settings = self.get_settings()
+        return {
+            "random_search_pauses": bool(settings.get("random_search_pauses", True)),
+            "show_cursor": bool(settings.get("show_cursor", False)),
+        }
+
+    def set_behavior_options(self, random_search_pauses, show_cursor):
+        """Persist the random-pause and debug-cursor switches."""
+        settings = self.settings_for_update()
+        settings["random_search_pauses"] = bool(random_search_pauses)
+        settings["show_cursor"] = bool(show_cursor)
+        self.save_settings(settings)
 
     def get_batch_pacing(self):
         """Return the multi-account batch pacing, with defaults for bad values."""

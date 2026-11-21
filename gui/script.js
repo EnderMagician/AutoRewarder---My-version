@@ -275,12 +275,17 @@ function update_coffee_break(message) {
     start_coffee_break(duration[1]);
     return;
   }
+  const pause = text.match(/^(Short|Longer) pause: sleeping for\s+([\d.]+)\s+seconds/i);
+  if (pause) {
+    start_coffee_break(pause[2], `${pause[1]} pause`);
+    return;
+  }
   const deviceSwitch = text.match(/Switching device: sleeping for\s+([\d.]+)\s+seconds/i);
   if (deviceSwitch) {
     start_coffee_break(deviceSwitch[1], 'Switching device');
     return;
   }
-  if (/Stop requested during coffee break|Stop requested.*halting/i.test(text)) {
+  if (/Stop requested during (coffee break|a pause)|Stop requested.*halting/i.test(text)) {
     clear_coffee_break();
   }
 }
@@ -533,12 +538,60 @@ function update_batch_run_ui(state, account, completed, total, skipped, waitSeco
     if (waiting) start_coffee_break(waitSeconds, 'Next account');
   } else if (!running) {
     clear_coffee_break();
+    clear_batch_eta();
     if (progress) progress.hidden = true;
     if (accountName) accountName.textContent = 'Ready to start';
   }
 
   update_status_indicator(running ? 'executing' : undefined);
   if (!running) refresh_account_ui();
+}
+
+// Batch time left. The backend sends a fresh estimate after every search and
+// at each account change; in between, the window counts down on its own.
+let batchEtaDeadline = null;
+let batchEtaTimer = null;
+
+function format_eta(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return 'under a minute left';
+  const minutes = Math.round(total / 60);
+  if (minutes < 60) return `about ${minutes} min left`;
+  const hours = Math.floor(minutes / 60);
+  return `about ${hours} h ${String(minutes % 60).padStart(2, '0')} min left`;
+}
+
+function render_batch_eta() {
+  const el = document.getElementById('batch_eta');
+  if (!el || batchEtaDeadline === null) return;
+  const seconds = (batchEtaDeadline - Date.now()) / 1000;
+  const text = format_eta(seconds);
+  // Only touch the DOM when the wording changes (once a minute at most).
+  if (el.textContent !== text) {
+    el.textContent = text;
+    const doneAt = new Date(batchEtaDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    el.title = `Estimated finish around ${doneAt}`;
+  }
+  el.hidden = false;
+}
+
+function update_batch_eta(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return;
+  batchEtaDeadline = Date.now() + value * 1000;
+  render_batch_eta();
+  if (!batchEtaTimer) batchEtaTimer = window.setInterval(render_batch_eta, 1000);
+}
+
+function clear_batch_eta() {
+  if (batchEtaTimer) window.clearInterval(batchEtaTimer);
+  batchEtaTimer = null;
+  batchEtaDeadline = null;
+  const el = document.getElementById('batch_eta');
+  if (el) {
+    el.hidden = true;
+    el.textContent = '';
+  }
 }
 
 async function start_all_accounts() {
@@ -1074,7 +1127,8 @@ function open_settings_modal() {
     pywebview.api.get_manual_search_delay(),
     pywebview.api.get_batch_pacing(),
     pywebview.api.get_search_profiles(),
-  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks, searchDelay, batchPacing, profiles]) => {
+    pywebview.api.get_behavior_options(),
+  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks, searchDelay, batchPacing, profiles, behavior]) => {
     searchProfilesCache = Array.isArray(profiles) ? profiles : [];
     render_schedule_cards(schedules || []);
 
@@ -1113,6 +1167,13 @@ function open_settings_modal() {
     const delayMax = document.getElementById('searchDelayMax');
     if (delayMin) delayMin.value = Number.isFinite(delay.minimum) ? delay.minimum : 4;
     if (delayMax) delayMax.value = Number.isFinite(delay.maximum) ? delay.maximum : 10;
+
+    // Random pauses default on, the debug cursor off, if the API failed.
+    const behaviorOptions = behavior || {};
+    const randomPausesToggle = document.getElementById('randomPausesToggle');
+    if (randomPausesToggle) randomPausesToggle.checked = behaviorOptions.random_search_pauses !== false;
+    const showCursorToggle = document.getElementById('showCursorToggle');
+    if (showCursorToggle) showCursorToggle.checked = Boolean(behaviorOptions.show_cursor);
 
     // Run all accounts pacing — fall back to the backend defaults.
     load_batch_pacing_fields(batchPacing || {});
@@ -1670,6 +1731,14 @@ async function save_settings() {
     const delaySaved = await pywebview.api.set_manual_search_delay(delayMinValue, delayMaxValue);
     if (delaySaved === false) {
       show_toast('Could not save the search delay.', 'error');
+    }
+
+    const behaviorSaved = await pywebview.api.set_behavior_options(
+      Boolean(document.getElementById('randomPausesToggle').checked),
+      Boolean(document.getElementById('showCursorToggle').checked)
+    );
+    if (behaviorSaved === false) {
+      show_toast('Could not save the search behavior options.', 'error');
     }
 
     const pacingSaved = await pywebview.api.set_batch_pacing(batchPacing.pacing);

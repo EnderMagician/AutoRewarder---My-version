@@ -334,6 +334,8 @@ select:focus-visible,
 .batch-account-status { display: inline-flex; align-items: center; gap: 5px; }
 .batch-account-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
 .batch-progress { padding: 0 13px 7px; color: var(--blue); font-size: 10px; }
+.batch-eta::before { content: " · "; }
+.batch-eta[hidden] { display: none; }
 
 .run-mode-option {
   display: flex;

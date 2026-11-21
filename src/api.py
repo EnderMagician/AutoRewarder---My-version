@@ -40,6 +40,7 @@ from .accounts import (
 )
 from .emulator import DriverManager, HumanBehavior, edge_policy
 from .search import HistoryManager, SearchEngine, llm, resolve_search_locale
+from .search.engine import expected_search_seconds
 from .search.profiles import (
     AUTO_PROFILE,
     RANDOM_PROFILE,
@@ -60,6 +61,7 @@ from .stats import (
     POINTS_PER_SEARCH,
     POINTS_PER_CARD,
 )
+from .batch_eta import BatchEta, format_eta
 from .batch_pacing import (
     default_batch_pacing,
     format_duration,
@@ -129,6 +131,8 @@ class AutoRewarderAPI:
         # Set when the user clicks Stop. Long loops in search_engine and
         # daily_set poll this between iterations and bail out cleanly.
         self._stop_event = threading.Event()
+        # Time-left estimate while "Run all accounts" is running (batch_eta.py).
+        self._batch_eta = None
         self.run_coordinator = RunCoordinator()
         self.run_origin = RUN_ORIGIN_INTERACTIVE
 
@@ -213,6 +217,21 @@ class AutoRewarderAPI:
                 profile_path=None, hide_browser=self.hide_browser
             )
             self.search_engine = SearchEngine(logger=self.log, history=None)
+        self._apply_behavior_options()
+
+    def _behavior_options(self):
+        """The saved random-pause and debug-cursor switches (defaults if unreadable)."""
+        try:
+            return self.global_settings.get_behavior_options()
+        except Exception:
+            return {"random_search_pauses": True, "show_cursor": False}
+
+    def _apply_behavior_options(self):
+        """Push the behavior switches onto the live search engine."""
+        options = self._behavior_options()
+        if getattr(self, "search_engine", None) is not None:
+            self.search_engine.random_pauses = options["random_search_pauses"]
+            self.search_engine.show_cursor = options["show_cursor"]
 
     # ------------------------------------------------------------------
     # Webview plumbing
@@ -696,6 +715,25 @@ class AutoRewarderAPI:
             self.log(f"[WARNING] Failed to save batch Daily tasks setting: {e}")
             return False
 
+    def get_behavior_options(self):
+        """Return {random_search_pauses, show_cursor} for the Settings modal."""
+        return self._behavior_options()
+
+    def set_behavior_options(self, random_search_pauses, show_cursor):
+        """
+        Persist the random-pause and debug-cursor switches and apply them.
+
+        Returns:
+            bool: True if saved, False otherwise.
+        """
+        try:
+            self.global_settings.set_behavior_options(random_search_pauses, show_cursor)
+        except Exception as e:
+            self.log(f"[WARNING] Failed to save search behavior options: {e}")
+            return False
+        self._apply_behavior_options()
+        return True
+
     def get_batch_pacing(self):
         """Return how "Run all accounts" paces accounts (see batch_pacing.py)."""
         return self.global_settings.get_batch_pacing()
@@ -936,6 +974,70 @@ class AutoRewarderAPI:
             self.log(f"[WARNING] Could not read batch pacing, using defaults: {e}")
             return default_batch_pacing()
 
+    def _new_batch_eta(self, plans, phase_gap_range, include_daily_tasks):
+        """Set up the time-left estimate for a planned batch."""
+        try:
+            delay = self.global_settings.get_manual_search_delay()
+        except Exception:
+            delay = DEFAULT_SEARCH_DELAY
+        prior = expected_search_seconds(
+            delay, self._behavior_options()["random_search_pauses"]
+        )
+
+        # Advanced Scheduling spreads an account over its run duration, so
+        # that, not the search count, decides how long it takes.
+        timed = {}
+        for plan in plans:
+            schedule = self._get_account_schedule(plan.account["id"])
+            if schedule.get("enabled") and schedule.get("advancedScheduling"):
+                try:
+                    hours = max(1.0, float(schedule.get("runDuration", 3)))
+                except (TypeError, ValueError):
+                    hours = 3.0
+                timed[plan.account["id"]] = hours * 3600
+
+        # sample_pause draws from Beta(2, 4), whose mean is a third of the range.
+        phase_gap_mean = 0.0
+        if phase_gap_range:
+            low, high = phase_gap_range
+            phase_gap_mean = low + (high - low) / 3
+
+        return BatchEta(
+            plans,
+            prior,
+            phase_gap_mean=phase_gap_mean,
+            include_daily_tasks=include_daily_tasks,
+            timed_accounts=timed,
+        )
+
+    def _report_batch_eta(self, log=False):
+        """Send the batch's time left to the GUI, and to the log when asked."""
+        eta = getattr(self, "_batch_eta", None)
+        if eta is None:
+            return
+        seconds = eta.seconds_left()
+        if log:
+            done_at = time.strftime("%H:%M", time.localtime(time.time() + seconds))
+            self.log(
+                f"Batch time left: about {format_eta(seconds)} (done around {done_at})."
+            )
+        if self._webview_window:
+            try:
+                self._webview_window.evaluate_js(
+                    "typeof update_batch_eta === 'function' && "
+                    f"update_batch_eta({seconds:.0f})"
+                )
+            except Exception:
+                pass
+
+    def _on_search_done(self, _succeeded):
+        """Called by the search loop after each search; advances the batch estimate."""
+        eta = getattr(self, "_batch_eta", None)
+        if eta is None:
+            return
+        eta.search_done()
+        self._report_batch_eta()
+
     def _log_batch_plan(self, plans, pacing):
         """Write the order and counts the batch is about to use to the log."""
         if not plans:
@@ -1040,6 +1142,10 @@ class AutoRewarderAPI:
                 if pacing["enabled"]
                 else None
             )
+            self._batch_eta = self._new_batch_eta(
+                plans, phase_gap_range, bool(include_daily_tasks)
+            )
+            self._report_batch_eta(log=True)
 
             total = len(plans)
             skipped_count = len(skipped)
@@ -1052,6 +1158,7 @@ class AutoRewarderAPI:
                 account_id = account["id"]
 
                 if plan.gap_before > 0:
+                    self._batch_eta.start_wait(account_id)
                     self.log(
                         f"Waiting {format_duration(plan.gap_before)} before "
                         f"starting '{account['label']}'…"
@@ -1064,6 +1171,7 @@ class AutoRewarderAPI:
                         skipped=skipped_count,
                         wait_seconds=plan.gap_before,
                     )
+                    self._report_batch_eta()
                     if self._sleep_with_stop(plan.gap_before):
                         self.log("Batch stopped while waiting for the next account.")
                         return {
@@ -1084,6 +1192,8 @@ class AutoRewarderAPI:
                     skipped=skipped_count,
                 )
                 pc_count, mobile_count = plan.pc_count, plan.mobile_count
+                self._batch_eta.start_account(account_id)
+                self._report_batch_eta(log=True)
                 outcome = self._run_current_account(
                     pc_count,
                     mobile_count,
@@ -1099,6 +1209,7 @@ class AutoRewarderAPI:
                     and outcome.get("pc_completed") == pc_count
                     and outcome.get("mobile_completed") == mobile_count
                 )
+                self._batch_eta.finish_account(account_id)
                 if outcome.get("completed") or daily_task_only_failure:
                     self._mark_account_completed_today(account_id)
                     completed.append(account_id)
@@ -1148,6 +1259,7 @@ class AutoRewarderAPI:
                 "daily_task_failure_accounts": daily_task_failure_accounts,
             }
         finally:
+            self._batch_eta = None
             if original_account_id is not None:
                 try:
                     self._select_account_for_batch(original_account_id)
@@ -3261,7 +3373,11 @@ class AutoRewarderAPI:
 
         self._driver = self.driver_manager.setup_driver(mobile=False)
         try:
-            human = HumanBehavior(self._driver, show_cursor=True, mobile=False)
+            human = HumanBehavior(
+                self._driver,
+                show_cursor=self._behavior_options()["show_cursor"],
+                mobile=False,
+            )
             success = self.daily_set.perform_daily_set(
                 self._driver, human, stop_event=self._stop_event
             )
@@ -3692,6 +3808,9 @@ class AutoRewarderAPI:
             }
         daily_success = None
         phase_error = None
+        eta = getattr(self, "_batch_eta", None)
+        if eta is not None:
+            eta.start_phase()
         try:
             done = self.search_engine.perform_searches(
                 self._driver,
@@ -3699,6 +3818,7 @@ class AutoRewarderAPI:
                 mobile=mobile,
                 stop_event=self._stop_event,
                 search_delay_range=search_delay_range,
+                on_search_done=self._on_search_done,
             )
             # Tally successful searches against the right platform bucket.
             bucket = "mobile" if mobile else "pc"
@@ -3719,7 +3839,11 @@ class AutoRewarderAPI:
                         )
                     else:
                         self.log("Force daily tasks is ON. Starting Daily Set tasks...")
-                    human = HumanBehavior(self._driver, show_cursor=True, mobile=mobile)
+                    human = HumanBehavior(
+                        self._driver,
+                        show_cursor=self._behavior_options()["show_cursor"],
+                        mobile=mobile,
+                    )
                     success = self.daily_set.perform_daily_set(
                         self._driver, human, stop_event=self._stop_event
                     )

@@ -18,10 +18,12 @@ Welcome! This guide will help you get started with AutoRewarder and explain all 
 - [Daily tasks only](#daily-tasks-only)
 - [Visual Search](#visual-search)
 - [What's Happening?](#whats-happening)
+- [Search behavior](#search-behavior)
 
 ### Settings & Automation
 - [Understanding the Settings](#understanding-the-settings)
 - [Rewards Dashboard](#rewards-dashboard)
+- [Show automation cursor](#show-automation-cursor)
 - [Hide Browser](#hide-browser)
 - [Force daily tasks & visual search](#force-daily-tasks--visual-search)
 - [Run all accounts pacing](#run-all-accounts-pacing)
@@ -128,11 +130,11 @@ Adding another account is slightly different, so please follow these steps:
 ### What's Happening?
 
 - AutoRewarder opens Microsoft Edge (you can see it if hide-browser is off)
-- It performs random searches from a built-in list of +10k real search queries (from a google-trends dataset) or from your own LLM provider (if enabled)
-- Each search has human-like delays and behavior
+- It searches the account's [search interests](#search-interests) (or random queries from a built-in list of +10k real search queries, or your own LLM provider if enabled)
+- Each search behaves like a person searching (see [Search behavior](#search-behavior))
 - It runs the PC phase first, then the Mobile phase (iPhone emulation)
-- It may occasionally switch to Images/Videos/News tabs
-- It may take short "coffee breaks" during longer sessions
+- It may occasionally switch to Images/Videos/News tabs, or open a result and read it
+- It takes "coffee breaks" every few searches and, now and then, a random pause
 - If Schedule is enabled and Advanced scheduling is on, the run is paced across the schedule duration using the queries-per-hour target. You will see a clear "Done!" message in the logs when the advanced scheduling run fully completes.
 - After the PC phase, it collects Daily Set + "More Activities" click-through tasks (once per day, per account). Locked cards, sweepstakes and promo banners are automatically skipped — only point-earning tasks are clicked
 - If the Visual Search task isn't completed, it will be completed as part of the daily task flow or after PC phase.
@@ -140,6 +142,16 @@ Adding another account is slightly different, so please follow these steps:
 - You'll see updates in the log window
 
 If a new version is available, AutoRewarder can show an update notification and a download link.
+
+### Search behavior
+
+Every session has its own pace (a typing and reading speed picked for that session), and each search goes like this:
+
+1. **Sometimes a random pause** before it, about 1 in 10 searches for 15–60 s and about 1 in 30 for 1.5–4 minutes. These are on top of the coffee breaks, and the status bar counts them down. Turn them off in **Settings → Search pace → Random pauses between searches**.
+2. **Where it searches from:** most follow-up searches are typed into the results page's own search box, the way people refine a search. The rest start from the Bing homepage.
+3. **Typing:** it clicks (or taps) the search box, then types at a human pace: quicker inside common letter pairs, a beat between words, an occasional hesitation, and now and then a slipped key that gets erased with Backspace.
+4. **Reading:** on desktop, the page is scrolled with real mouse-wheel input in short bursts, with reading pauses, the occasional scroll back up and a little mouse movement. On mobile, it swipes.
+5. **Sometimes it opens a result,** usually one of the top two, reads it for a while and comes back.
 
 ### Daily tasks only
 
@@ -183,6 +195,10 @@ This per-account setting lives at the top of each account page (**Settings → A
 - **Legacy:** Forces the bot to use the older Rewards dashboard layout.
 - **New:** Forces the bot to use the updated, new Rewards dashboard layout.
 
+### Show automation cursor
+
+In **Settings → General**, **Show automation cursor** draws a red dot where the bot moves the mouse, turning green on clicks. The dot is added to the web page itself, so Bing's own scripts can see it. It's off by default; turn it on only while you're watching a run.
+
 ### Hide Browser
 
 This toggle controls whether you can see Microsoft Edge while searches are happening.
@@ -222,6 +238,8 @@ The values are saved in the application settings and reused during future manual
 - **Extra searches** — each account's PC and Mobile counts are treated as a minimum, and the batch adds a random number of searches on top, up to this percentage (**15%** by default, 0–50 allowed). The totals change from day to day, and an account never runs fewer searches than you set. A count of 0 stays at 0.
 
 The log starts each batch with the plan it chose, for example `Batch plan: Work (PC 33, Mobile 21, Mobile first) → Personal (PC 30, Mobile 22)`. Pressing **Stop** during a pause ends the batch right away. Accounts that already finished are skipped when you run the batch again.
+
+**Time left:** while a batch runs, the main window shows an estimate under the progress (for example `about 52 min left`; hover it for the finish time). The log also gives it at the start and at each account, for example `Batch time left: about 52 min (done around 15:20)`. The estimate starts from the expected time per search (your delay, typing and reading, plus the average share of coffee breaks and random pauses), then follows the pace the batch actually runs at. The pauses between accounts are known in advance and count exactly. Accounts with Advanced Scheduling count as their run duration.
 
 > [!NOTE]
 > A batch of 3 accounts now takes about 10–30 minutes longer than before because of the pauses. Accounts with Advanced Scheduling turned on still spread their searches over their own run duration.
