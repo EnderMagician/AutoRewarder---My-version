@@ -24,7 +24,9 @@ Welcome! This guide will help you get started with AutoRewarder and explain all 
 - [Rewards Dashboard](#rewards-dashboard)
 - [Hide Browser](#hide-browser)
 - [Force daily tasks & visual search](#force-daily-tasks--visual-search)
+- [Run all accounts pacing](#run-all-accounts-pacing)
 - [Autostart & Daily Run Time](#autostart--daily-run-time)
+- [Search interests](#search-interests)
 - [AI-generated search terms (LLM)](#ai-generated-search-terms-llm)
 - [Scheduled runs](#scheduled-runs)
 - [Managing accounts](#managing-accounts)
@@ -208,6 +210,22 @@ The values are saved in the application settings and reused during future manual
 > [!NOTE]
 > These settings apply to normal manual runs only. Scheduled runs and runs using Advanced Scheduling from GUI use their own pacing rules and do not use the configured manual delay range.
 
+### Run all accounts pacing
+
+**Run all accounts** goes through every ready account in turn. By default it paces that batch the way a person would, instead of opening one account right after another in the same order with the same counts every day. These options are in **Settings → Run all accounts pacing**:
+
+- **Humanize batch runs** — the master switch. Turn it off to get the old behavior: every account immediately, in list order, with exact counts.
+- **Shuffle account order** — the accounts run in a different order on every batch.
+- **Pause between accounts** — a random wait before each account after the first, **4–15 minutes** by default (0–240 allowed). Short waits are more likely than long ones. The main window shows which account is up next and a countdown.
+- **Mix PC and Mobile order** — about half the accounts start with their Mobile searches. Daily tasks always run with the PC searches.
+- **Pause between PC and Mobile** — a random wait when switching from one to the other, **30–180 seconds** by default (0–1,800 allowed).
+- **Extra searches** — each account's PC and Mobile counts are treated as a minimum, and the batch adds a random number of searches on top, up to this percentage (**15%** by default, 0–50 allowed). The totals change from day to day, and an account never runs fewer searches than you set. A count of 0 stays at 0.
+
+The log starts each batch with the plan it chose, for example `Batch plan: Work (PC 33, Mobile 21, Mobile first) → Personal (PC 30, Mobile 22)`. Pressing **Stop** during a pause ends the batch right away. Accounts that already finished are skipped when you run the batch again.
+
+> [!NOTE]
+> A batch of 3 accounts now takes about 10–30 minutes longer than before because of the pauses. Accounts with Advanced Scheduling turned on still spread their searches over their own run duration.
+
 ### Force daily tasks & visual search
 
 AutoRewarder records, per account and per day, that the Daily Set and the Visual Search have been done, so a second run of the same day skips them. Two toggles in the **Daily tasks** section of the Settings window let you override that record:
@@ -216,6 +234,29 @@ AutoRewarder records, per account and per day, that the Daily Set and the Visual
 - **Force visual search:** runs the visual search even when today is already marked as done. A different image is picked each time, so nothing is uploaded twice.
 
 Both are **off by default**, which keeps the normal behaviour: what already ran today is not redone. Turn one on when you don't trust the saved status — for instance a task that was marked as done but did not credit.
+
+### Search interests
+
+Each account searches like one person with a few hobbies, instead of picking random queries from a huge list. There are 10 search profiles, each with 4 interests: one game, one film series, one kind of manga, and one everyday subject.
+
+| Profile | Game | Films | Manga | Everyday questions |
+| :--- | :--- | :--- | :--- | :--- |
+| Dark fantasy | Elden Ring | The Lord of the Rings | Dark fantasy manga | Medieval history & mythology |
+| Sci-fi | Cyberpunk 2077 | Star Wars | Mecha manga & anime | Space & astronomy |
+| Builder & magic | Minecraft | Harry Potter films | Isekai manga | DIY & home improvement |
+| Competitive & superheroes | League of Legends | Marvel Cinematic Universe | Shonen battle manga | Fitness & workouts |
+| Horror | Resident Evil | The Conjuring universe | Horror manga | Health & sleep |
+| Adventure & travel | Zelda: Tears of the Kingdom | Indiana Jones | Adventure fantasy manga | Travel & geography |
+| Strategy & money | Civilization | Dune films | Strategy & mind-game manga | Economics & personal finance |
+| Cars & sports | Forza Horizon 5 | Fast & Furious | Sports manga | Car care |
+| Cozy & cooking | Stardew Valley | Studio Ghibli films | Slice-of-life & romance manga | Cooking & recipes |
+| Mystery & tech | Grand Theft Auto | James Bond | Mystery & detective manga | Tech help |
+
+- **One profile per account.** A new account gets a profile that no other account uses, the first time it searches, and keeps it. With more than 10 accounts, the least-used profile is reused.
+- **Change it** in **Settings → Scheduled runs → (open the account) → Search interests**. The list shows which other accounts already use each profile. **Random mix (no profile)** brings back the old random queries for that account.
+- **Related searches.** A run moves in short streaks of 1–3 searches about the same thing, such as a boss, a character or a film, then moves on. Each run leans toward some interests more than others, and Mobile searches lean toward the everyday questions.
+- **No repeats in a row.** Queries the account searched in the last 10 days are held back while fresh ones are left. A few searches in every run (about 5–15%) still come from the general list.
+- **With AI enabled**, the provider is asked for queries about the account's interests, so you get the same focus with more variety.
 
 ### AI-generated search terms (LLM)
 
@@ -226,7 +267,7 @@ By default, AutoRewarder draws its searches from a large built-in list of Englis
 - **API key:** Paste a key from your chosen provider — the **Get an API key** link under the field opens the right page (OpenAI Platform, Anthropic Console or Google AI Studio). The key is stored locally in your `settings.json` (plain text) and is only sent to that provider to request queries or list its models — no personal data is shared.
 - **Language:** Leave **`auto`** to follow the language of the computer running AutoRewarder (detected automatically), or type a locale such as `fr-FR`, `it-IT`, or `en-US` to force one.
 
-On each run, AutoRewarder asks the provider for a fresh batch of queries in your language. If generation fails for any reason — no key, an invalid key, an exceeded quota, or no internet — it falls back to the built-in list, so your run always completes.
+On each run, AutoRewarder asks the provider for a fresh batch of queries in your language, about the account's [search interests](#search-interests) unless it is set to Random mix. If generation fails for any reason — no key, an invalid key, an exceeded quota, or no internet — it falls back to the built-in list, so your run always completes.
 
 > [!NOTE]
 > Using an LLM provider may incur costs on your provider account, depending on their pricing. Query generation uses very few tokens per run.

@@ -217,7 +217,15 @@ function clear_coffee_break() {
   if (divider) divider.hidden = true;
 }
 
-function start_coffee_break(seconds) {
+function format_countdown(seconds) {
+  const total = Math.max(0, Math.ceil(seconds));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  const rest = String(total % 60).padStart(2, '0');
+  return `${minutes}:${rest}`;
+}
+
+function start_coffee_break(seconds, label) {
   const duration = Number(seconds);
   if (!Number.isFinite(duration) || duration <= 0) return;
 
@@ -233,6 +241,11 @@ function start_coffee_break(seconds) {
   const progress = document.getElementById('coffee_break_progress');
   if (!indicator || !divider || !text || !track || !progress) return;
 
+  const title = document.getElementById('coffee_break_label');
+  const titleText = label || 'Coffee break';
+  if (title) title.textContent = titleText;
+  track.setAttribute('aria-label', `${titleText} progress`);
+
   indicator.hidden = false;
   divider.hidden = false;
   const startedAt = performance.now();
@@ -242,7 +255,7 @@ function start_coffee_break(seconds) {
     const remaining = Math.max(0, Math.ceil(duration - elapsed));
     progress.style.transform = `scaleX(${percent / 100})`;
     track.setAttribute('aria-valuenow', String(percent));
-    text.textContent = remaining > 0 ? `${remaining}s remaining` : 'Resuming…';
+    text.textContent = remaining > 0 ? `${format_countdown(remaining)} remaining` : 'Resuming…';
 
     if (remaining <= 0) {
       window.clearInterval(coffeeBreakTimer);
@@ -260,6 +273,11 @@ function update_coffee_break(message) {
   const duration = text.match(/Sleeping for\s+([\d.]+)\s+seconds to mimic a coffee break\./i);
   if (duration) {
     start_coffee_break(duration[1]);
+    return;
+  }
+  const deviceSwitch = text.match(/Switching device: sleeping for\s+([\d.]+)\s+seconds/i);
+  if (deviceSwitch) {
+    start_coffee_break(deviceSwitch[1], 'Switching device');
     return;
   }
   if (/Stop requested during coffee break|Stop requested.*halting/i.test(text)) {
@@ -488,8 +506,9 @@ function set_batch_controls(running) {
   }
 }
 
-function update_batch_run_ui(state, account, completed, total, skipped) {
-  const running = state === 'running';
+function update_batch_run_ui(state, account, completed, total, skipped, waitSeconds) {
+  const waiting = state === 'waiting';
+  const running = state === 'running' || waiting;
   set_batch_controls(running);
 
   const batchBtn = document.getElementById('batch_run_btn');
@@ -508,7 +527,10 @@ function update_batch_run_ui(state, account, completed, total, skipped) {
       progressText.textContent =
         `${current} of ${runnableTotal} remaining · ${skippedCount} skipped today`;
     }
-    if (accountName) accountName.textContent = `Running ${account}`;
+    if (accountName) {
+      accountName.textContent = waiting ? `Up next: ${account}` : `Running ${account}`;
+    }
+    if (waiting) start_coffee_break(waitSeconds, 'Next account');
   } else if (!running) {
     clear_coffee_break();
     if (progress) progress.hidden = true;
@@ -1050,7 +1072,10 @@ function open_settings_modal() {
     pywebview.api.get_llm_config(),
     pywebview.api.get_force_tasks(),
     pywebview.api.get_manual_search_delay(),
-  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks, searchDelay]) => {
+    pywebview.api.get_batch_pacing(),
+    pywebview.api.get_search_profiles(),
+  ]).then(([schedules, startup, closeToTray, llmConfig, forceTasks, searchDelay, batchPacing, profiles]) => {
+    searchProfilesCache = Array.isArray(profiles) ? profiles : [];
     render_schedule_cards(schedules || []);
 
     // Start-with-Windows toggle — disable row on unsupported OS.
@@ -1089,6 +1114,9 @@ function open_settings_modal() {
     if (delayMin) delayMin.value = Number.isFinite(delay.minimum) ? delay.minimum : 4;
     if (delayMax) delayMax.value = Number.isFinite(delay.maximum) ? delay.maximum : 10;
 
+    // Run all accounts pacing — fall back to the backend defaults.
+    load_batch_pacing_fields(batchPacing || {});
+
     // LLM search-term generation.
     const cfg = llmConfig || {};
     const llmToggle = document.getElementById('llmToggle');
@@ -1123,6 +1151,78 @@ function close_settings_modal() {
   if (backdrop) backdrop.hidden = true;
 }
 
+// Run all accounts pacing. Defaults mirror src/batch_pacing.py.
+const BATCH_PACING_DEFAULTS = {
+  enabled: true,
+  shuffle_accounts: true,
+  randomize_phase_order: true,
+  account_gap_min: 4,
+  account_gap_max: 15,
+  phase_gap_min: 30,
+  phase_gap_max: 180,
+  count_variance: 15,
+};
+
+const BATCH_PACING_NUMBER_FIELDS = {
+  account_gap_min: 'batchGapMin',
+  account_gap_max: 'batchGapMax',
+  phase_gap_min: 'batchPhaseGapMin',
+  phase_gap_max: 'batchPhaseGapMax',
+  count_variance: 'batchCountVariance',
+};
+
+const BATCH_PACING_TOGGLES = {
+  enabled: 'batchPacingToggle',
+  shuffle_accounts: 'batchShuffleToggle',
+  randomize_phase_order: 'batchPhaseOrderToggle',
+};
+
+function load_batch_pacing_fields(pacing) {
+  for (const [key, id] of Object.entries(BATCH_PACING_TOGGLES)) {
+    const toggle = document.getElementById(id);
+    if (toggle) toggle.checked = typeof pacing[key] === 'boolean' ? pacing[key] : BATCH_PACING_DEFAULTS[key];
+  }
+  for (const [key, id] of Object.entries(BATCH_PACING_NUMBER_FIELDS)) {
+    const field = document.getElementById(id);
+    if (field) field.value = Number.isFinite(pacing[key]) ? pacing[key] : BATCH_PACING_DEFAULTS[key];
+  }
+  apply_batch_pacing_state();
+}
+
+// Returns the pacing payload, or a warning message when a value is invalid.
+function read_batch_pacing_fields() {
+  const pacing = {};
+  for (const [key, id] of Object.entries(BATCH_PACING_TOGGLES)) {
+    pacing[key] = Boolean(document.getElementById(id).checked);
+  }
+  for (const [key, id] of Object.entries(BATCH_PACING_NUMBER_FIELDS)) {
+    pacing[key] = parseFloat(document.getElementById(id).value);
+  }
+
+  const inRange = (value, max) => Number.isFinite(value) && value >= 0 && value <= max;
+  if (!inRange(pacing.account_gap_min, 240) || !inRange(pacing.account_gap_max, 240)
+      || pacing.account_gap_min > pacing.account_gap_max) {
+    return { error: 'Pause between accounts must be 0–240 minutes, with minimum ≤ maximum.' };
+  }
+  if (!inRange(pacing.phase_gap_min, 1800) || !inRange(pacing.phase_gap_max, 1800)
+      || pacing.phase_gap_min > pacing.phase_gap_max) {
+    return { error: 'Pause between PC and Mobile must be 0–1800 s, with minimum ≤ maximum.' };
+  }
+  if (!Number.isInteger(pacing.count_variance) || !inRange(pacing.count_variance, 50)) {
+    return { error: 'Extra searches must be a whole number from 0 to 50 %.' };
+  }
+  return { pacing: pacing };
+}
+
+function apply_batch_pacing_state() {
+  const toggle = document.getElementById('batchPacingToggle');
+  const fields = document.getElementById('batch_pacing_fields');
+  if (!fields) return;
+  const enabled = Boolean(toggle && toggle.checked);
+  fields.classList.toggle('dim', !enabled);
+  fields.querySelectorAll('input').forEach(input => { input.disabled = !enabled; });
+}
+
 // Dim + disable the LLM config fields when the feature is toggled off.
 function apply_llm_field_state() {
   const toggle = document.getElementById('llmToggle');
@@ -1145,6 +1245,46 @@ function open_background_logs() {
   pywebview.api.open_background_logs_window();
 }
 
+// Search profiles from assets/search_profiles.json, loaded with the Settings modal.
+let searchProfilesCache = [];
+
+// Per-account "Search interests" dropdown. Notes which other accounts already
+// use each profile, since separate profiles keep accounts from looking alike.
+function make_search_profile_field(item, schedules) {
+  const current = item.search_profile || 'auto';
+  const usedBy = {};
+  for (const other of schedules) {
+    if (other.id === item.id || !other.search_profile) continue;
+    (usedBy[other.search_profile] = usedBy[other.search_profile] || []).push(other.label);
+  }
+
+  const options = [{ value: 'auto', label: 'Automatic (one no other account uses)' }];
+  for (const profile of searchProfilesCache) {
+    const others = usedBy[profile.id];
+    const note = others ? ` (also ${others.join(', ')})` : '';
+    options.push({ value: profile.id, label: `${profile.name}${note}` });
+  }
+  options.push({ value: 'random', label: 'Random mix (no profile)' });
+  if (!options.some(opt => opt.value === current)) {
+    options.unshift({ value: current, label: `${current} (missing)` });
+  }
+
+  const field = make_select_field('Search interests', 'schedule-search-profile', current, options);
+  const hint = document.createElement('p');
+  hint.className = 'form-hint';
+  const select = field.querySelector('select');
+  const describe = () => {
+    const profile = searchProfilesCache.find(p => p.id === select.value);
+    if (profile) hint.textContent = profile.summary;
+    else if (select.value === 'random') hint.textContent = 'Random queries from the built-in list, as before.';
+    else hint.textContent = 'A profile is picked on the next run and kept from then on.';
+  };
+  select.addEventListener('change', describe);
+  describe();
+  field.appendChild(hint);
+  return field;
+}
+
 function render_schedule_cards(schedules) {
   const container = document.getElementById('schedule_accounts_list');
   const empty = document.getElementById('schedule_empty');
@@ -1161,7 +1301,7 @@ function render_schedule_cards(schedules) {
   empty.hidden = true;
 
   for (const item of schedules) {
-    const card = build_schedule_card(item);
+    const card = build_schedule_card(item, schedules);
     container.appendChild(card);
   }
 }
@@ -1180,7 +1320,7 @@ function format_schedule_summary(item, sched, enabled) {
   return `${prefix}${time} · PC ${pc} / Mobile ${mobile}`;
 }
 
-function build_schedule_card(item) {
+function build_schedule_card(item, allSchedules) {
   const acc = { id: item.id, label: item.label };
   const sched = item.schedule || {};
 
@@ -1256,6 +1396,9 @@ function build_schedule_card(item) {
     { value: 'legacy', label: 'Legacy' },
     { value: 'new', label: 'New' },
   ]));
+
+  // Search interests (applies to every run of this account).
+  body.appendChild(make_search_profile_field(item, allSchedules || []));
 
   // Advanced scheduling sub-toggle row.
   const advRow = document.createElement('label');
@@ -1420,6 +1563,8 @@ async function save_settings() {
     const dashEl = card.querySelector('.schedule-dashboard');
     const dashboardVariant = dashEl && ['auto', 'legacy', 'new'].includes(dashEl.value)
       ? dashEl.value : 'auto';
+    const profileEl = card.querySelector('.schedule-search-profile');
+    const searchProfile = profileEl ? profileEl.value : '';
 
     if (enabled) {
       if (isNaN(pc) || pc < 0 || pc > 130) {
@@ -1453,6 +1598,7 @@ async function save_settings() {
     payloads.push({
       id: id,
       dashboardVariant: dashboardVariant,
+      searchProfile: searchProfile,
       payload: {
         enabled: enabled,
         advancedScheduling: advancedScheduling,
@@ -1471,6 +1617,12 @@ async function save_settings() {
   if (!Number.isFinite(delayMinValue) || !Number.isFinite(delayMaxValue)
       || delayMinValue < 0 || delayMaxValue > 1800 || delayMinValue > delayMaxValue) {
     show_toast('Search delay must be 0–1800 s, with minimum ≤ maximum.', 'warning');
+    return;
+  }
+
+  const batchPacing = read_batch_pacing_fields();
+  if (batchPacing.error) {
+    show_toast(batchPacing.error, 'warning');
     return;
   }
 
@@ -1494,6 +1646,14 @@ async function save_settings() {
       pywebview.api.set_dashboard_variant(p.id, p.dashboardVariant)
     ));
 
+    // Persist each account's search interests the same way.
+    const profileResults = await Promise.all(payloads
+      .filter(p => p.searchProfile)
+      .map(p => pywebview.api.set_search_profile(p.id, p.searchProfile)));
+    if (profileResults.some(ok => ok === false)) {
+      show_toast('Could not save the search interests for an account.', 'error');
+    }
+
     // Persist the force toggles (independent of the schedule slicing).
     await save_force_task_controls();
 
@@ -1510,6 +1670,11 @@ async function save_settings() {
     const delaySaved = await pywebview.api.set_manual_search_delay(delayMinValue, delayMaxValue);
     if (delaySaved === false) {
       show_toast('Could not save the search delay.', 'error');
+    }
+
+    const pacingSaved = await pywebview.api.set_batch_pacing(batchPacing.pacing);
+    if (pacingSaved === false) {
+      show_toast('Could not save the Run all accounts pacing.', 'error');
     }
 
     const scheduleCalls = payloads.map(p =>
@@ -1728,6 +1893,9 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+
+  const batchPacingToggle = document.getElementById('batchPacingToggle');
+  if (batchPacingToggle) batchPacingToggle.addEventListener('change', apply_batch_pacing_state);
 
   // LLM feature toggle dims/undims its config fields live.
   const llmToggle = document.getElementById('llmToggle');

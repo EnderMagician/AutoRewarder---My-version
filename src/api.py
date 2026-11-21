@@ -25,6 +25,7 @@ from .config import (
     CURRENT_VERSION,
     JSON_FILE_PATH,
     LOG_FILE_PATH,
+    SEARCH_PROFILES_PATH,
     BASE_DIR,
     edge_profile_path,
     history_path,
@@ -39,6 +40,18 @@ from .accounts import (
 )
 from .emulator import DriverManager, HumanBehavior, edge_policy
 from .search import HistoryManager, SearchEngine, llm, resolve_search_locale
+from .search.profiles import (
+    AUTO_PROFILE,
+    RANDOM_PROFILE,
+    blend_general_queries,
+    build_profile_streaks,
+    choose_profile,
+    describe_profiles,
+    find_profile,
+    general_mix_count,
+    load_profiles,
+    profile_summary,
+)
 from .dailytasks import DailySet
 from .stats import (
     StatsManager,
@@ -46,6 +59,12 @@ from .stats import (
     scrape_points_balance_debug,
     POINTS_PER_SEARCH,
     POINTS_PER_CARD,
+)
+from .batch_pacing import (
+    default_batch_pacing,
+    format_duration,
+    plan_batch,
+    sample_pause,
 )
 from .run_coordinator import (
     RUN_ORIGIN_BATCH,
@@ -677,6 +696,23 @@ class AutoRewarderAPI:
             self.log(f"[WARNING] Failed to save batch Daily tasks setting: {e}")
             return False
 
+    def get_batch_pacing(self):
+        """Return how "Run all accounts" paces accounts (see batch_pacing.py)."""
+        return self.global_settings.get_batch_pacing()
+
+    def set_batch_pacing(self, pacing):
+        """
+        Persist the multi-account batch pacing from the Settings modal.
+
+        Returns:
+            bool: True if every value was valid and saved, False otherwise.
+        """
+        try:
+            return self.global_settings.set_batch_pacing(pacing)
+        except Exception as e:
+            self.log(f"[WARNING] Failed to save batch pacing: {e}")
+            return False
+
     def get_manual_search_delay(self):
         """
         Return the min/max delay for normal manual searches, in seconds.
@@ -862,15 +898,22 @@ class AutoRewarderAPI:
         schedule["last_triggered_date"] = date.today().isoformat()
         meta.set_schedule(schedule)
 
-    def _notify_batch_ui(self, state, account=None, completed=0, total=0, skipped=0):
-        """Update batch-specific GUI state when a webview is attached."""
+    def _notify_batch_ui(
+        self, state, account=None, completed=0, total=0, skipped=0, wait_seconds=0
+    ):
+        """
+        Update batch-specific GUI state when a webview is attached.
+
+        `state` is "running", "waiting" (pausing `wait_seconds` before
+        `account` starts) or "idle".
+        """
         if not self._webview_window:
             return
         try:
             self._webview_window.evaluate_js(
                 "typeof update_batch_run_ui === 'function' && update_batch_run_ui("
                 f"{json.dumps(state)}, {json.dumps(account)}, {int(completed)}, "
-                f"{int(total)}, {int(skipped)})"
+                f"{int(total)}, {int(skipped)}, {float(wait_seconds):.1f})"
             )
         except Exception:
             pass
@@ -881,8 +924,42 @@ class AutoRewarderAPI:
         self._rebuild_account_context()
         self._broadcast_account_ui()
 
+    def _batch_random(self):
+        """Randomness source for batch planning; tests pin it with a seed."""
+        return getattr(self, "_batch_rng", None) or random
+
+    def _get_batch_pacing(self):
+        """Return the saved batch pacing, or the defaults if it can't be read."""
+        try:
+            return self.global_settings.get_batch_pacing()
+        except Exception as e:
+            self.log(f"[WARNING] Could not read batch pacing, using defaults: {e}")
+            return default_batch_pacing()
+
+    def _log_batch_plan(self, plans, pacing):
+        """Write the order and counts the batch is about to use to the log."""
+        if not plans:
+            return
+        if not pacing["enabled"]:
+            self.log(
+                "Batch pacing is off: running accounts back to back in list order."
+            )
+        steps = []
+        for plan in plans:
+            parts = [f"PC {plan.pc_count}", f"Mobile {plan.mobile_count}"]
+            if plan.mobile_first and plan.pc_count and plan.mobile_count:
+                parts.append("Mobile first")
+            steps.append(f"{plan.account['label']} ({', '.join(parts)})")
+        self.log("Batch plan: " + " → ".join(steps))
+
     def run_all_accounts(self, include_daily_tasks=False):
-        """Run every ready account sequentially, resuming completed accounts by date."""
+        """
+        Run every ready account in turn, resuming completed accounts by date.
+
+        With batch pacing on (the default) the accounts run in a shuffled
+        order, with a pause of several minutes between them, slightly varied
+        search counts and a mixed PC/Mobile order. See batch_pacing.py.
+        """
         if not self._run_lock.acquire(blocking=False):
             self._notify_batch_ui("idle")
             return {
@@ -947,14 +1024,56 @@ class AutoRewarderAPI:
                 else:
                     runnable_accounts.append(account)
 
-            total = len(runnable_accounts)
+            pacing = self._get_batch_pacing()
+            counts = {
+                account["id"]: self._get_batch_query_counts(
+                    self._get_account_schedule(account["id"])
+                )
+                for account in runnable_accounts
+            }
+            plans = plan_batch(
+                runnable_accounts, counts, pacing, rng=self._batch_random()
+            )
+            self._log_batch_plan(plans, pacing)
+            phase_gap_range = (
+                (pacing["phase_gap_min"], pacing["phase_gap_max"])
+                if pacing["enabled"]
+                else None
+            )
+
+            total = len(plans)
             skipped_count = len(skipped)
             self._notify_batch_ui(
                 "running", completed=0, total=total, skipped=skipped_count
             )
 
-            for account in runnable_accounts:
+            for plan in plans:
+                account = plan.account
                 account_id = account["id"]
+
+                if plan.gap_before > 0:
+                    self.log(
+                        f"Waiting {format_duration(plan.gap_before)} before "
+                        f"starting '{account['label']}'…"
+                    )
+                    self._notify_batch_ui(
+                        "waiting",
+                        account["label"],
+                        completed=len(completed),
+                        total=total,
+                        skipped=skipped_count,
+                        wait_seconds=plan.gap_before,
+                    )
+                    if self._sleep_with_stop(plan.gap_before):
+                        self.log("Batch stopped while waiting for the next account.")
+                        return {
+                            "status": "stopped",
+                            "completed_account_ids": completed,
+                            "skipped_account_ids": skipped,
+                            "failed_account_id": None,
+                            "error": None,
+                            "daily_task_failure_accounts": daily_task_failure_accounts,
+                        }
 
                 self._select_account_for_batch(account_id)
                 self._notify_batch_ui(
@@ -964,12 +1083,13 @@ class AutoRewarderAPI:
                     total=total,
                     skipped=skipped_count,
                 )
-                schedule = self._get_account_schedule(account_id)
-                pc_count, mobile_count = self._get_batch_query_counts(schedule)
+                pc_count, mobile_count = plan.pc_count, plan.mobile_count
                 outcome = self._run_current_account(
                     pc_count,
                     mobile_count,
                     include_daily_tasks=bool(include_daily_tasks),
+                    mobile_first=plan.mobile_first,
+                    phase_gap_range=phase_gap_range,
                 )
                 daily_task_only_failure = (
                     bool(include_daily_tasks)
@@ -1045,7 +1165,7 @@ class AutoRewarderAPI:
         return AccountMetaManager(account_id).get_schedule()
 
     def get_all_schedules(self):
-        """Return [{id, label, first_setup_done, schedule, dashboard_variant}] for the settings modal."""
+        """Return [{id, label, first_setup_done, schedule, dashboard_variant, search_profile}] for the settings modal."""
         result = []
         for acc in self.account_manager.list():
             meta = AccountMetaManager(acc["id"])
@@ -1056,6 +1176,7 @@ class AutoRewarderAPI:
                     "first_setup_done": acc["first_setup_done"],
                     "schedule": meta.get_schedule(),
                     "dashboard_variant": meta.get_dashboard_variant(),
+                    "search_profile": meta.get_search_profile(),
                 }
             )
         return result
@@ -2750,8 +2871,19 @@ class AutoRewarderAPI:
         mobile_count,
         include_daily_tasks=True,
         run_context="manual",
+        mobile_first=False,
+        phase_gap_range=None,
     ):
-        """Run the selected account once and return a structured outcome."""
+        """
+        Run the selected account once and return a structured outcome.
+
+        Args:
+            mobile_first (bool): run the Mobile phase before the PC phase.
+                The Daily tasks stay with the PC phase either way.
+            phase_gap_range (tuple | None): (min, max) seconds to pause
+                between the two phases; None keeps them back to back.
+                Neither applies under Advanced Scheduling, which paces itself.
+        """
         try:
             pc = max(0, int(pc_count or 0))
             mobile = max(0, int(mobile_count or 0))
@@ -2800,39 +2932,52 @@ class AutoRewarderAPI:
                 )
                 return outcome
             else:
-                if pc > 0:
+                phases = [(False, pc), (True, mobile)]
+                if mobile_first:
+                    phases.reverse()
+                phases = [(is_mobile, count) for is_mobile, count in phases if count]
+
+                for index, (is_mobile, count) in enumerate(phases):
+                    if self._stop_event.is_set():
+                        outcome["stopped"] = True
+                        return outcome
+                    if index > 0 and phase_gap_range:
+                        gap = sample_pause(*phase_gap_range, rng=self._batch_random())
+                        label = "Mobile" if is_mobile else "PC"
+                        self.log(
+                            f"Switching device: sleeping for {gap:.1f} seconds "
+                            f"before the {label} phase."
+                        )
+                        if self._sleep_with_stop(gap):
+                            outcome["stopped"] = True
+                            return outcome
+
                     phase = self._run_phase(
-                        mobile=False,
-                        count=pc,
-                        do_daily_set=bool(include_daily_tasks),
+                        mobile=is_mobile,
+                        count=count,
+                        do_daily_set=bool(include_daily_tasks) and not is_mobile,
                         search_delay_range=search_delay_range,
                     )
+                    if is_mobile:
+                        outcome["mobile_completed"] = phase["completed"]
+                        if phase["error"] or phase["completed"] != count:
+                            outcome["error"] = (
+                                phase["error"] or "mobile_search_incomplete"
+                            )
+                            outcome["stopped"] = self._stop_event.is_set()
+                            return outcome
+                        continue
+
                     outcome["pc_completed"] = phase["completed"]
                     outcome["daily_success"] = phase["daily_success"]
                     daily_task_only_failure = (
                         phase["error"] in _DAILY_TASK_FAILURE_ERRORS
-                        and phase["completed"] == pc
+                        and phase["completed"] == count
                     )
                     if daily_task_only_failure:
                         outcome["error"] = phase["error"]
-                    elif phase["error"] or phase["completed"] != pc:
+                    elif phase["error"] or phase["completed"] != count:
                         outcome["error"] = phase["error"] or "pc_search_incomplete"
-                        outcome["stopped"] = self._stop_event.is_set()
-                        return outcome
-
-                if mobile > 0:
-                    if self._stop_event.is_set():
-                        outcome["stopped"] = True
-                        return outcome
-                    phase = self._run_phase(
-                        mobile=True,
-                        count=mobile,
-                        do_daily_set=False,
-                        search_delay_range=search_delay_range,
-                    )
-                    outcome["mobile_completed"] = phase["completed"]
-                    if phase["error"] or phase["completed"] != mobile:
-                        outcome["error"] = phase["error"] or "mobile_search_incomplete"
                         outcome["stopped"] = self._stop_event.is_set()
                         return outcome
 
@@ -3163,19 +3308,26 @@ class AutoRewarderAPI:
             self._driver = None
             time.sleep(0.5)
 
-    def _build_queries(self, count):
+    def _build_queries(self, count, mobile=False):
         """
         Build the list of queries for a phase.
 
-        When LLM generation is enabled and an API key is set, ask the chosen
-        provider for `count` fresh queries in the user's language. Any failure
-        (no key, invalid key, quota, offline, malformed answer) or a shortfall
-        is transparently topped up / replaced with a random sample from the
-        static assets/queries.json, so the daily search target is still met and
-        the run never depends on the network.
+        Queries follow the account's search profile (see search/profiles.py):
+        related searches about its interests, plus a few from the general
+        list. An account set to "random" gets the old random sample of
+        assets/queries.json instead.
+
+        When LLM generation is enabled and an API key is set, the chosen
+        provider is asked for `count` fresh queries in the user's language,
+        about the profile's interests when there is one. Any failure (no key,
+        invalid key, quota, offline, malformed answer) or a shortfall is
+        topped up from the profile, then from the static file, so the daily
+        search target is still met and the run never depends on the network.
 
         Args:
             count (int): how many queries to produce.
+            mobile (bool): whether this is the Mobile phase, which leans
+                toward the profile's everyday questions.
 
         Returns:
             list: up to `count` query strings (empty only if the static file is
@@ -3184,6 +3336,7 @@ class AutoRewarderAPI:
         if count <= 0:
             return []
 
+        profile = self._resolve_search_profile()
         queries = []
         cfg = self.global_settings.get_llm_config()
         if cfg["use_llm_queries"]:
@@ -3203,20 +3356,30 @@ class AutoRewarderAPI:
                     api_key=cfg["llm_api_key"],
                     base_url=cfg["llm_base_url"],
                     logger=self.log,
+                    interests=(
+                        [i.get("about") or i["name"] for i in profile["interests"]]
+                        if profile
+                        else None
+                    ),
                 )
                 if not queries:
                     self.log(
                         "[WARNING] LLM generation failed — "
-                        "falling back to static queries."
+                        "falling back to built-in queries."
                     )
             else:
                 self.log(
                     "[WARNING] LLM enabled but no API key set — "
-                    "using static queries."
+                    "using built-in queries."
                 )
 
         if len(queries) >= count:
             return queries[:count]
+
+        if profile is not None:
+            return queries + self._build_profile_queries(
+                profile, count - len(queries), mobile, exclude=queries
+            )
 
         # Top up from the static file, skipping any query the LLM already
         # produced. Request extra headroom so de-dup can't leave us short.
@@ -3236,6 +3399,124 @@ class AutoRewarderAPI:
             f"topped up with {len(extra)} static queries."
         )
         return queries + extra
+
+    def _build_profile_queries(self, profile, count, mobile, exclude=()):
+        """
+        Build `count` queries from a search profile plus a few general ones.
+
+        Recently searched profile queries are held back using this account's
+        history; the general list fills whatever the profile can't.
+        """
+        history = []
+        if self.history is not None:
+            try:
+                history = self.history.get_history()
+            except Exception:
+                history = []
+
+        general_count = general_mix_count(count)
+        streaks = build_profile_streaks(
+            profile, count - general_count, mobile=mobile, history=history
+        )
+        themed = [query for streak in streaks for query in streak]
+
+        seen = {q.lower() for q in exclude} | {q.lower() for q in themed}
+        needed = count - len(themed)
+        general = []
+        if needed > 0:
+            static = self.search_engine.load_queries_from_json(
+                JSON_FILE_PATH, num_needed=needed + len(seen)
+            )
+            general = [q for q in static if q.lower() not in seen][:needed]
+
+        self.log(
+            f"Search interests '{profile.get('name', profile['id'])}': "
+            f"{len(themed)} themed + {len(general)} general queries."
+        )
+
+        from .utils import humanize_queries
+
+        return humanize_queries(blend_general_queries(streaks, general))
+
+    # ------------------------------------------------------------------
+    # Search profiles (per-account interests)
+    # ------------------------------------------------------------------
+
+    def _search_profiles(self):
+        """The profiles from assets/search_profiles.json ([] if unreadable)."""
+        return load_profiles(SEARCH_PROFILES_PATH)
+
+    def _resolve_search_profile(self, account_id=None):
+        """
+        Return the search profile for an account, or None for the random list.
+
+        An account still on "auto" (or on a profile that no longer exists)
+        gets the profile fewest other accounts use, saved so it keeps
+        searching the same interests from then on.
+        """
+        account_id = account_id or self.account_manager.current_id()
+        if not account_id:
+            return None
+        profiles = self._search_profiles()
+        meta = AccountMetaManager(account_id)
+        chosen = meta.get_search_profile()
+        if chosen == RANDOM_PROFILE or not profiles:
+            return None
+
+        profile = find_profile(profiles, chosen)
+        if profile is not None:
+            return profile
+
+        if chosen != AUTO_PROFILE:
+            self.log(
+                f"[WARNING] Search profile '{chosen}' no longer exists. "
+                "Picking a new one."
+            )
+        taken = [
+            AccountMetaManager(acc["id"]).get_search_profile()
+            for acc in self.account_manager.list()
+            if acc["id"] != account_id
+        ]
+        picked = find_profile(profiles, choose_profile(profiles, taken))
+        if picked is None:
+            return None
+        try:
+            meta.set_search_profile(picked["id"])
+        except OSError as e:
+            self.log(f"[WARNING] Could not save the search profile: {e}")
+        self.log(
+            f"Assigned search interests '{picked.get('name', picked['id'])}' "
+            f"to this account: {profile_summary(picked)}."
+        )
+        return picked
+
+    def get_search_profiles(self):
+        """Return [{id, name, summary, interests}] for the Settings dropdown."""
+        return describe_profiles(self._search_profiles())
+
+    def set_search_profile(self, account_id, profile_id):
+        """
+        Persist which search profile an account uses.
+
+        Args:
+            account_id (str): the account to update.
+            profile_id (str): a profile id, "auto" or "random".
+
+        Returns:
+            bool: True if saved, False if the account or value is invalid.
+        """
+        if not account_id or not self.account_manager.exists(account_id):
+            return False
+        valid = {AUTO_PROFILE, RANDOM_PROFILE} | {
+            p["id"] for p in self._search_profiles()
+        }
+        if profile_id not in valid:
+            return False
+        try:
+            return AccountMetaManager(account_id).set_search_profile(profile_id)
+        except OSError as e:
+            self.log(f"[WARNING] Failed to save search profile: {e}")
+            return False
 
     def _run_visual_search_if_needed(self):
         """
@@ -3385,7 +3666,7 @@ class AutoRewarderAPI:
             f"=== {label} phase — {count} {'queries' if count != 1 else 'query'} ==="
         )
 
-        queries_to_search = self._build_queries(count)
+        queries_to_search = self._build_queries(count, mobile=mobile)
         if not queries_to_search:
             self.log(f"[WARNING] {label}: no queries available. Skipping phase.")
             if self.history is not None:

@@ -166,7 +166,7 @@
       <span id="status_text">Loading…</span>
       <span class="status-divider" id="coffee_break_divider" hidden aria-hidden="true"></span>
       <span class="coffee-break-indicator" id="coffee_break_indicator" hidden>
-        <span class="coffee-break-copy"><span>Coffee break</span><time id="coffee_break_text">—</time></span>
+        <span class="coffee-break-copy"><span id="coffee_break_label">Coffee break</span><time id="coffee_break_text">—</time></span>
         <span class="coffee-break-track" id="coffee_break_track" role="progressbar" aria-label="Coffee break progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="coffee_break_progress"></span></span>
       </span>
     </div>
@@ -281,6 +281,66 @@
               <label for="searchDelayMax">Maximum delay (seconds)</label>
               <input type="number" id="searchDelayMax" min="0" max="1800" step="0.5" inputmode="decimal" placeholder="10">
             </div>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <div class="settings-group-title">Run all accounts pacing</div>
+          <p class="settings-group-hint">Space accounts out like a person would, instead of running them back to back in the same order with the same counts every day.</p>
+          <label class="settings-row">
+            <div class="settings-row-text">
+              <div class="settings-row-label">Humanize batch runs</div>
+              <div class="settings-row-hint">Turn off to run every account immediately, in list order, with exact counts.</div>
+            </div>
+            <span class="toggle-compact">
+              <input type="checkbox" id="batchPacingToggle">
+              <span class="toggle-pill"></span>
+            </span>
+          </label>
+          <div id="batch_pacing_fields" class="batch-pacing-fields">
+            <label class="settings-row">
+              <div class="settings-row-text">
+                <div class="settings-row-label">Shuffle account order</div>
+                <div class="settings-row-hint">Run the accounts in a different order on every batch.</div>
+              </div>
+              <span class="toggle-compact">
+                <input type="checkbox" id="batchShuffleToggle">
+                <span class="toggle-pill"></span>
+              </span>
+            </label>
+            <label class="settings-row">
+              <div class="settings-row-text">
+                <div class="settings-row-label">Mix PC and Mobile order</div>
+                <div class="settings-row-hint">Some accounts start on Mobile. Daily tasks still run with the PC searches.</div>
+              </div>
+              <span class="toggle-compact">
+                <input type="checkbox" id="batchPhaseOrderToggle">
+                <span class="toggle-pill"></span>
+              </span>
+            </label>
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label for="batchGapMin">Pause between accounts, min (minutes)</label>
+                <input type="number" id="batchGapMin" min="0" max="240" step="0.5" inputmode="decimal" placeholder="4">
+              </div>
+              <div class="form-field">
+                <label for="batchGapMax">Pause between accounts, max (minutes)</label>
+                <input type="number" id="batchGapMax" min="0" max="240" step="0.5" inputmode="decimal" placeholder="15">
+              </div>
+              <div class="form-field">
+                <label for="batchPhaseGapMin">Pause between PC and Mobile, min (seconds)</label>
+                <input type="number" id="batchPhaseGapMin" min="0" max="1800" step="5" inputmode="decimal" placeholder="30">
+              </div>
+              <div class="form-field">
+                <label for="batchPhaseGapMax">Pause between PC and Mobile, max (seconds)</label>
+                <input type="number" id="batchPhaseGapMax" min="0" max="1800" step="5" inputmode="decimal" placeholder="180">
+              </div>
+              <div class="form-field">
+                <label for="batchCountVariance">Extra searches, up to (%)</label>
+                <input type="number" id="batchCountVariance" min="0" max="50" step="1" inputmode="numeric" placeholder="15">
+              </div>
+            </div>
+            <p class="form-hint">Each account's counts are a minimum: a batch adds a random number of searches on top, up to this percentage, so the totals change from day to day.</p>
           </div>
         </section>
 

@@ -1,7 +1,15 @@
+import random
 import threading
 import unittest
 
 from src.api import AutoRewarderAPI
+from src.batch_pacing import default_batch_pacing
+
+
+def _pacing(enabled):
+    pacing = default_batch_pacing()
+    pacing["enabled"] = enabled
+    return pacing
 
 
 class _Lease:
@@ -71,8 +79,12 @@ class _Accounts:
 
 
 class _GlobalSettings:
-    def __init__(self):
+    def __init__(self, pacing=None):
         self.data = {}
+        self.pacing = pacing or _pacing(False)
+
+    def get_batch_pacing(self):
+        return dict(self.pacing)
 
     def get_settings(self):
         return dict(self.data)
@@ -85,12 +97,17 @@ class _GlobalSettings:
 
 
 class BatchRunnerTests(unittest.TestCase):
-    def _api(self, outcomes):
+    def _api(self, outcomes, pacing=None):
         api = AutoRewarderAPI.__new__(AutoRewarderAPI)
         api._run_lock = threading.Lock()
         api._stop_event = threading.Event()
         api._webview_window = None
-        api.log = lambda _message: None
+        api.logs = []
+        api.log = api.logs.append
+        api.global_settings = _GlobalSettings(pacing)
+        api._batch_rng = random.Random(7)
+        api.sleeps = []
+        api._sleep_with_stop = lambda seconds: api.sleeps.append(seconds) or False
         api.account_manager = _Accounts()
         api.run_coordinator = _Coordinator()
         api._rebuild_account_context = lambda: None
@@ -107,10 +124,16 @@ class BatchRunnerTests(unittest.TestCase):
         api._mark_account_completed_today = api.marked.append
         api.calls = []
 
-        def run_current(pc, mobile, include_daily_tasks):
+        api.call_options = []
+
+        def run_current(pc, mobile, include_daily_tasks, **options):
             account_id = api.account_manager.current_id()
             api.calls.append((account_id, pc, mobile, include_daily_tasks))
-            return outcomes[account_id]
+            api.call_options.append(options)
+            outcome = outcomes[account_id]
+            if callable(outcome):
+                return outcome(pc, mobile)
+            return outcome
 
         api._run_current_account = run_current
         return api
@@ -131,6 +154,10 @@ class BatchRunnerTests(unittest.TestCase):
         self.assertEqual([("ready-a", 11, 4, True), ("ready-b", 7, 2, True)], api.calls)
         self.assertEqual(["ready-a", "ready-b"], api.marked)
         self.assertEqual("original", api.account_manager.current_id())
+        self.assertEqual([], api.sleeps)
+        self.assertEqual(
+            [{"mobile_first": False, "phase_gap_range": None}] * 2, api.call_options
+        )
 
     def test_batch_progress_excludes_completed_today_accounts_from_remaining_total(
         self,
@@ -255,6 +282,103 @@ class BatchRunnerTests(unittest.TestCase):
         self.assertEqual(["batch"], coordinator.origins)
 
 
+class PacedBatchRunnerTests(unittest.TestCase):
+    """Run all accounts with the default (humanized) pacing."""
+
+    _api = BatchRunnerTests._api
+
+    def _paced_api(self, outcomes=None, seed=7):
+        def done(pc, mobile):
+            return {
+                "completed": True,
+                "stopped": False,
+                "error": None,
+                "pc_completed": pc,
+                "mobile_completed": mobile,
+            }
+
+        api = self._api(outcomes or {"ready-a": done, "ready-b": done}, _pacing(True))
+        api._batch_rng = random.Random(seed)
+        return api
+
+    def test_paced_batch_waits_between_accounts_but_not_before_the_first(self):
+        api = self._paced_api()
+        notifications = []
+
+        def notify(state, account=None, completed=0, total=0, skipped=0, **kw):
+            notifications.append((state, account, kw.get("wait_seconds", 0)))
+
+        api._notify_batch_ui = notify
+
+        result = api.run_all_accounts()
+
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(1, len(api.sleeps))
+        self.assertTrue(4 * 60 <= api.sleeps[0] <= 15 * 60, api.sleeps)
+        waits = [n for n in notifications if n[0] == "waiting"]
+        self.assertEqual(1, len(waits))
+        labels = {"ready-a": "Ready A", "ready-b": "Ready B"}
+        self.assertEqual(labels[api.calls[1][0]], waits[0][1])
+        self.assertEqual(api.sleeps[0], waits[0][2])
+
+    def test_paced_batch_only_adds_searches_within_the_variance(self):
+        for seed in range(30):
+            api = self._paced_api(seed=seed)
+            api.run_all_accounts()
+            configured = {"ready-a": (11, 4), "ready-b": (7, 2)}
+            for account_id, pc, mobile, _daily in api.calls:
+                base_pc, base_mobile = configured[account_id]
+                self.assertTrue(base_pc <= pc <= base_pc + 2, (seed, pc))
+                self.assertTrue(
+                    base_mobile <= mobile <= base_mobile + 1, (seed, mobile)
+                )
+            self.assertEqual(sorted(api.marked), ["ready-a", "ready-b"])
+
+    def test_paced_batch_changes_order_and_phase_order_across_runs(self):
+        orders = set()
+        mobile_first = set()
+        for seed in range(30):
+            api = self._paced_api(seed=seed)
+            api.run_all_accounts()
+            orders.add(tuple(call[0] for call in api.calls))
+            for options in api.call_options:
+                mobile_first.add(options["mobile_first"])
+                self.assertEqual((30.0, 180.0), options["phase_gap_range"])
+        self.assertEqual({("ready-a", "ready-b"), ("ready-b", "ready-a")}, orders)
+        self.assertEqual({True, False}, mobile_first)
+
+    def test_stop_during_the_wait_ends_the_batch_without_running_the_next_account(
+        self,
+    ):
+        api = self._paced_api()
+        api._sleep_with_stop = lambda seconds: api.sleeps.append(seconds) or True
+
+        result = api.run_all_accounts()
+
+        self.assertEqual("stopped", result["status"])
+        self.assertIsNone(result["failed_account_id"])
+        self.assertEqual(1, len(api.calls))
+        self.assertEqual([api.calls[0][0]], api.marked)
+        self.assertEqual("original", api.account_manager.current_id())
+
+    def test_daily_task_only_failure_is_judged_against_the_varied_counts(self):
+        def daily_failed(pc, mobile):
+            return {
+                "completed": False,
+                "stopped": False,
+                "error": "daily_tasks_failed",
+                "pc_completed": pc,
+                "mobile_completed": mobile,
+            }
+
+        api = self._paced_api({"ready-a": daily_failed, "ready-b": daily_failed})
+
+        result = api.run_all_accounts(include_daily_tasks=True)
+
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(2, len(result["daily_task_failure_accounts"]))
+
+
 class SingleAccountRunTests(unittest.TestCase):
     def _api(self):
         api = AutoRewarderAPI.__new__(AutoRewarderAPI)
@@ -295,6 +419,55 @@ class SingleAccountRunTests(unittest.TestCase):
         self.assertTrue(result["completed"])
         self.assertEqual([(False, 11, True), (True, 4, False)], phases)
         self.assertEqual([(2.0, 5.0), (2.0, 5.0)], delays)
+
+    def test_mobile_first_runs_mobile_then_pc_with_daily_tasks_after_a_pause(self):
+        api = self._api()
+        api._batch_rng = random.Random(3)
+        sleeps = []
+        api._sleep_with_stop = lambda seconds: sleeps.append(seconds) or False
+        phases = []
+
+        def run_phase(mobile, count, do_daily_set, search_delay_range=None):
+            phases.append((mobile, count, do_daily_set))
+            return {
+                "expected": count,
+                "completed": count,
+                "daily_success": True if do_daily_set else None,
+                "error": None,
+            }
+
+        api._run_phase = run_phase
+
+        result = api._run_current_account(
+            11, 4, include_daily_tasks=True, mobile_first=True, phase_gap_range=(30, 90)
+        )
+
+        self.assertTrue(result["completed"])
+        self.assertEqual([(True, 4, False), (False, 11, True)], phases)
+        self.assertEqual(1, len(sleeps))
+        self.assertTrue(30 <= sleeps[0] <= 90)
+
+    def test_stop_during_the_phase_pause_skips_the_second_phase(self):
+        api = self._api()
+        api._sleep_with_stop = lambda _seconds: True
+        phases = []
+
+        def run_phase(mobile, count, do_daily_set, search_delay_range=None):
+            phases.append(mobile)
+            return {
+                "expected": count,
+                "completed": count,
+                "daily_success": None,
+                "error": None,
+            }
+
+        api._run_phase = run_phase
+
+        result = api._run_current_account(11, 4, phase_gap_range=(30, 90))
+
+        self.assertTrue(result["stopped"])
+        self.assertFalse(result["completed"])
+        self.assertEqual([False], phases)
 
     def test_single_account_finishes_mobile_searches_after_daily_task_failure(self):
         api = self._api()

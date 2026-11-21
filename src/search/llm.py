@@ -40,9 +40,29 @@ def _max_tokens(count):
     return min(8192, 512 + count * 30)
 
 
-def _build_prompt(count, loc):
-    """Phrase the generation instruction in the user's language."""
+def _build_prompt(count, loc, interests=None):
+    """
+    Phrase the generation instruction in the user's language.
+
+    With `interests` (short descriptions from the account's search profile),
+    the queries are about those subjects, in short runs of related searches,
+    instead of a mix of everyday topics.
+    """
     lang = language_name(loc)
+    if interests:
+        listed = "; ".join(interests)
+        return (
+            f"Generate {count} realistic web search queries that one person "
+            f"would type into a search engine over a day. This person is into: "
+            f"{listed}. Write them in {lang} (locale {loc}). Spread them across "
+            f"those interests, and group them in short runs of 1 to 3 related "
+            f"searches about the same specific thing (a boss, a character, a "
+            f"film, a chapter, a question), the way someone digs into a topic. "
+            f"Use real names and details. Keep each query short and natural "
+            f"(about 2 to 8 words), mostly lowercase, with no numbering, no "
+            f"quotes and no explanations. "
+            f"Return ONLY a JSON array of {count} distinct strings."
+        )
     return (
         f"Generate {count} realistic, varied web search queries that a typical "
         f"person would type into a search engine. Write them in {lang} "
@@ -226,7 +246,14 @@ def _extract_queries(text, count):
 
 
 def generate_queries(
-    count, locale, provider="openai", model="", api_key="", base_url="", logger=None
+    count,
+    locale,
+    provider="openai",
+    model="",
+    api_key="",
+    base_url="",
+    logger=None,
+    interests=None,
 ):
     """Generate up to `count` search queries in `locale`'s language via an LLM.
 
@@ -238,6 +265,8 @@ def generate_queries(
         model (str): model id; falls back to the provider default when blank.
         api_key (str): the user's own API key.
         logger (callable, optional): logging function.
+        interests (list[str], optional): subjects from the account's search
+            profile to focus the queries on.
 
     Returns:
         list[str]: query strings, or ``[]`` on any failure. Never raises.
@@ -257,7 +286,7 @@ def generate_queries(
         return []
 
     model = (model or "").strip() or DEFAULT_MODELS[provider]
-    prompt = _build_prompt(count, locale)
+    prompt = _build_prompt(count, locale, interests)
 
     try:
         if provider == "openai-compatible":

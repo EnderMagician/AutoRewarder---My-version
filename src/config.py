@@ -63,6 +63,7 @@ ACCOUNTS_DIR = os.path.join(APP_DIR, "accounts")
 GLOBAL_SETTINGS_PATH = os.path.join(APP_DIR, "settings.json")
 ACCOUNTS_INDEX_PATH = os.path.join(APP_DIR, "accounts.json")
 JSON_FILE_PATH = os.path.join(ASSETS_DIR, "queries.json")
+SEARCH_PROFILES_PATH = os.path.join(ASSETS_DIR, "search_profiles.json")
 
 # Legacy single-account paths (used only for one-shot migration detection).
 LEGACY_EDGE_PROFILE_PATH = os.path.join(APP_DIR, "EdgeProfile")

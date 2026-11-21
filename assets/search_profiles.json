@@ -1,0 +1,1914 @@
+{
+  "_comment": "Search profiles: each account searches one profile's interests so its history reads like one person's. Topics expand every item through every template ('{}' is the item); queries are used as-is. See src/search/profiles.py.",
+  "version": 1,
+  "profiles": [
+    {
+      "id": "dark-fantasy",
+      "name": "Dark fantasy",
+      "interests": [
+        {
+          "name": "Elden Ring",
+          "kind": "game",
+          "about": "the video game Elden Ring and its Shadow of the Erdtree DLC",
+          "topics": [
+            {
+              "items": [
+                "malenia",
+                "starscourge radahn",
+                "margit",
+                "godrick",
+                "rennala",
+                "morgott",
+                "mohg",
+                "maliketh",
+                "rykard",
+                "godfrey",
+                "messmer",
+                "rellana",
+                "bayle the dread"
+              ],
+              "templates": [
+                "how to beat {} elden ring",
+                "{} weakness elden ring",
+                "{} lore elden ring",
+                "where is {} elden ring",
+                "{} elden ring cheese"
+              ]
+            },
+            {
+              "items": [
+                "rivers of blood",
+                "moonveil",
+                "blasphemous blade",
+                "sword of night and flame",
+                "bloodhound's fang",
+                "dark moon greatsword",
+                "starscourge greatsword",
+                "giant-crusher",
+                "nagakiba",
+                "black knife"
+              ],
+              "templates": [
+                "{} location elden ring",
+                "{} build elden ring",
+                "is {} good elden ring",
+                "{} requirements elden ring"
+              ]
+            },
+            {
+              "items": [
+                "limgrave",
+                "liurnia",
+                "caelid",
+                "altus plateau",
+                "mountaintops of the giants",
+                "consecrated snowfield",
+                "siofra river",
+                "nokron eternal city",
+                "leyndell royal capital",
+                "crumbling farum azula",
+                "gravesite plain"
+              ],
+              "templates": [
+                "{} map fragment elden ring",
+                "{} walkthrough elden ring",
+                "things to do in {} elden ring",
+                "what level for {} elden ring"
+              ]
+            }
+          ],
+          "queries": [
+            "elden ring best starting class",
+            "elden ring how to respec",
+            "elden ring rune farming spot early",
+            "elden ring all endings explained",
+            "elden ring nightreign tips for beginners",
+            "elden ring scadutree fragment locations",
+            "elden ring how to get to the dlc",
+            "elden ring best talismans",
+            "elden ring how many flasks max",
+            "elden ring seamless coop mod"
+          ]
+        },
+        {
+          "name": "The Lord of the Rings",
+          "kind": "movies",
+          "about": "The Lord of the Rings and The Hobbit film series",
+          "topics": [
+            {
+              "items": [
+                "aragorn",
+                "gandalf",
+                "frodo",
+                "samwise gamgee",
+                "legolas",
+                "gimli",
+                "boromir",
+                "gollum",
+                "saruman",
+                "eowyn",
+                "faramir",
+                "galadriel",
+                "elrond"
+              ],
+              "templates": [
+                "{} actor lord of the rings",
+                "how old is {} lotr",
+                "what happens to {} after lotr",
+                "{} best scene lotr"
+              ]
+            },
+            {
+              "items": [
+                "the fellowship of the ring",
+                "the two towers",
+                "the return of the king",
+                "the hobbit an unexpected journey",
+                "the desolation of smaug",
+                "the battle of the five armies"
+              ],
+              "templates": [
+                "{} extended edition runtime",
+                "{} filming locations",
+                "{} box office",
+                "{} behind the scenes"
+              ]
+            }
+          ],
+          "queries": [
+            "lord of the rings watch order",
+            "lotr extended vs theatrical worth it",
+            "why didn't the eagles fly to mordor",
+            "rings of power season 3",
+            "the hunt for gollum release date",
+            "hobbiton movie set tour",
+            "how many oscars did return of the king win",
+            "howard shore lord of the rings soundtrack",
+            "middle earth map",
+            "who is tom bombadil"
+          ]
+        },
+        {
+          "name": "Dark fantasy manga",
+          "kind": "manga",
+          "about": "dark fantasy manga such as Berserk, Claymore and Vinland Saga",
+          "topics": [
+            {
+              "items": [
+                "berserk",
+                "claymore",
+                "hell's paradise",
+                "dorohedoro",
+                "vinland saga",
+                "attack on titan",
+                "goblin slayer",
+                "devilman",
+                "fire punch"
+              ],
+              "templates": [
+                "{} manga vs anime",
+                "{} manga ending explained",
+                "is {} worth reading",
+                "where to read {} manga",
+                "manga like {}",
+                "{} volume count"
+              ]
+            }
+          ],
+          "queries": [
+            "berserk manga after miura death",
+            "best dark fantasy manga",
+            "berserk eclipse chapter",
+            "berserk golden age arc order",
+            "berserk 1997 vs 2016 anime",
+            "kentaro miura influences",
+            "dark souls inspired by berserk",
+            "vinland saga season 3"
+          ]
+        },
+        {
+          "name": "Medieval history & mythology",
+          "kind": "general",
+          "about": "everyday questions about medieval history and mythology",
+          "topics": [
+            {
+              "items": [
+                "norse mythology",
+                "greek mythology",
+                "celtic mythology",
+                "egyptian mythology",
+                "japanese mythology"
+              ],
+              "templates": [
+                "{} gods list",
+                "{} creation story",
+                "best books on {}"
+              ]
+            },
+            {
+              "items": [
+                "the black death",
+                "the hundred years war",
+                "the crusades",
+                "the fall of constantinople",
+                "the wars of the roses",
+                "the norman conquest"
+              ],
+              "templates": [
+                "what caused {}",
+                "{} explained simply",
+                "{} timeline",
+                "how did {} end"
+              ]
+            }
+          ],
+          "queries": [
+            "how heavy was medieval armor",
+            "did vikings wear horned helmets",
+            "how were castles built",
+            "what did medieval peasants eat",
+            "longsword vs katana",
+            "who was charlemagne",
+            "how long did knights train",
+            "how does a trebuchet work",
+            "oldest castle still standing",
+            "how did people tell time in the middle ages"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sci-fi",
+      "name": "Sci-fi",
+      "interests": [
+        {
+          "name": "Cyberpunk 2077",
+          "kind": "game",
+          "about": "the video game Cyberpunk 2077 and its Phantom Liberty expansion",
+          "topics": [
+            {
+              "items": [
+                "johnny silverhand",
+                "judy alvarez",
+                "panam palmer",
+                "river ward",
+                "kerry eurodyne",
+                "goro takemura",
+                "songbird",
+                "jackie welles"
+              ],
+              "templates": [
+                "{} romance cyberpunk 2077",
+                "{} quest cyberpunk",
+                "{} voice actor cyberpunk",
+                "what happens to {} cyberpunk"
+              ]
+            },
+            {
+              "items": [
+                "mantis blades",
+                "gorilla arms",
+                "sandevistan",
+                "monowire",
+                "projectile launch system",
+                "berserk cyberware",
+                "optical camo"
+              ],
+              "templates": [
+                "{} build cyberpunk 2077",
+                "best {} cyberpunk 2.0",
+                "where to get {} cyberpunk"
+              ]
+            }
+          ],
+          "queries": [
+            "cyberpunk 2077 best ending",
+            "phantom liberty worth it",
+            "cyberpunk 2077 2.0 best builds",
+            "cyberpunk 2077 how to get the porsche",
+            "cyberpunk 2077 secret ending how to unlock",
+            "cyberpunk 2077 tower ending",
+            "cyberpunk 2 release date",
+            "cyberpunk edgerunners season 2",
+            "cyberpunk 2077 best cars",
+            "cyberpunk 2077 netrunner build"
+          ]
+        },
+        {
+          "name": "Star Wars",
+          "kind": "movies",
+          "about": "the Star Wars film saga",
+          "topics": [
+            {
+              "items": [
+                "darth vader",
+                "obi-wan kenobi",
+                "yoda",
+                "luke skywalker",
+                "anakin skywalker",
+                "darth maul",
+                "palpatine",
+                "ahsoka tano",
+                "mace windu",
+                "kylo ren",
+                "count dooku",
+                "qui-gon jinn"
+              ],
+              "templates": [
+                "{} lightsaber color",
+                "{} lightsaber form",
+                "how powerful is {}",
+                "{} backstory explained"
+              ]
+            },
+            {
+              "items": [
+                "a new hope",
+                "the empire strikes back",
+                "return of the jedi",
+                "the phantom menace",
+                "attack of the clones",
+                "revenge of the sith",
+                "the force awakens",
+                "rogue one",
+                "the mandalorian and grogu"
+              ],
+              "templates": [
+                "{} cast",
+                "{} box office",
+                "{} filming locations",
+                "{} ending explained"
+              ]
+            }
+          ],
+          "queries": [
+            "star wars watch order chronological",
+            "star wars machete order",
+            "andor season 2 review",
+            "how many star wars movies are there",
+            "is star wars rogue one canon",
+            "star wars kotor remake",
+            "best star wars books",
+            "john williams star wars themes",
+            "order 66 explained",
+            "what is the force in star wars"
+          ]
+        },
+        {
+          "name": "Mecha manga & anime",
+          "kind": "manga",
+          "about": "mecha manga and anime such as Gundam and Evangelion",
+          "topics": [
+            {
+              "items": [
+                "mobile suit gundam",
+                "neon genesis evangelion",
+                "code geass",
+                "knights of sidonia",
+                "gurren lagann",
+                "darling in the franxx",
+                "full metal panic",
+                "86 eighty six",
+                "patlabor",
+                "gundam the witch from mercury"
+              ],
+              "templates": [
+                "{} watch order",
+                "{} ending explained",
+                "{} manga vs anime",
+                "best mecha in {}",
+                "{} where to start"
+              ]
+            }
+          ],
+          "queries": [
+            "best mecha anime of all time",
+            "gunpla beginner kit",
+            "real grade vs master grade gundam",
+            "evangelion rebuild ending explained",
+            "what does nerv stand for",
+            "gundam universal century timeline",
+            "pacific rim inspired by anime",
+            "how tall is a gundam"
+          ]
+        },
+        {
+          "name": "Space & astronomy",
+          "kind": "general",
+          "about": "everyday questions about space and astronomy",
+          "topics": [
+            {
+              "items": [
+                "mars",
+                "jupiter",
+                "saturn",
+                "venus",
+                "mercury",
+                "neptune",
+                "uranus",
+                "pluto"
+              ],
+              "templates": [
+                "how long does it take to get to {}",
+                "how many moons does {} have",
+                "what is {} made of",
+                "can humans live on {}"
+              ]
+            },
+            {
+              "items": [
+                "black hole",
+                "neutron star",
+                "supernova",
+                "pulsar",
+                "quasar",
+                "nebula",
+                "red dwarf"
+              ],
+              "templates": [
+                "what is a {}",
+                "how does a {} form",
+                "closest {} to earth"
+              ]
+            }
+          ],
+          "queries": [
+            "artemis 2 launch",
+            "next spacex starship launch",
+            "how far is the moon",
+            "northern lights forecast tonight",
+            "is pluto a planet",
+            "best telescope for beginners",
+            "james webb telescope new images",
+            "when is the next meteor shower",
+            "how old is the universe",
+            "how big is the milky way"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builder",
+      "name": "Builder & magic",
+      "interests": [
+        {
+          "name": "Minecraft",
+          "kind": "game",
+          "about": "the video game Minecraft",
+          "topics": [
+            {
+              "items": [
+                "ender dragon",
+                "wither",
+                "warden",
+                "creeper",
+                "enderman",
+                "piglin brute",
+                "breeze",
+                "elder guardian",
+                "ravager"
+              ],
+              "templates": [
+                "how to beat {} minecraft",
+                "{} drops minecraft",
+                "how to find {} minecraft"
+              ]
+            },
+            {
+              "items": [
+                "villager",
+                "allay",
+                "sniffer",
+                "axolotl",
+                "camel",
+                "armadillo"
+              ],
+              "templates": [
+                "how to breed {} minecraft",
+                "what does {} do minecraft",
+                "how to get {} minecraft"
+              ]
+            },
+            {
+              "items": [
+                "starter house",
+                "iron farm",
+                "automatic sugar cane farm",
+                "mob farm",
+                "villager trading hall",
+                "medieval castle",
+                "redstone door",
+                "xp farm"
+              ],
+              "templates": [
+                "minecraft {} tutorial",
+                "easy {} minecraft",
+                "{} minecraft 1.21"
+              ]
+            }
+          ],
+          "queries": [
+            "minecraft best enchantments for sword",
+            "minecraft how to get mending",
+            "how to get to the end minecraft",
+            "minecraft netherite upgrade template",
+            "minecraft best seeds 1.21",
+            "minecraft trial chambers loot",
+            "a minecraft movie sequel",
+            "how to make a beacon minecraft",
+            "minecraft shaders install",
+            "minecraft java vs bedrock"
+          ]
+        },
+        {
+          "name": "Harry Potter films",
+          "kind": "movies",
+          "about": "the Harry Potter and Fantastic Beasts film series",
+          "topics": [
+            {
+              "items": [
+                "severus snape",
+                "albus dumbledore",
+                "hermione granger",
+                "ron weasley",
+                "draco malfoy",
+                "sirius black",
+                "luna lovegood",
+                "neville longbottom",
+                "bellatrix lestrange",
+                "hagrid",
+                "newt scamander"
+              ],
+              "templates": [
+                "{} actor harry potter",
+                "{} patronus",
+                "{} wand wood",
+                "what house is {}"
+              ]
+            },
+            {
+              "items": [
+                "philosopher's stone",
+                "chamber of secrets",
+                "prisoner of azkaban",
+                "goblet of fire",
+                "order of the phoenix",
+                "half-blood prince",
+                "deathly hallows part 2"
+              ],
+              "templates": [
+                "{} runtime",
+                "{} filming locations",
+                "{} deleted scenes",
+                "{} book vs movie differences"
+              ]
+            }
+          ],
+          "queries": [
+            "harry potter hbo series release date",
+            "harry potter watch order",
+            "warner bros studio tour london tickets",
+            "hogwarts legacy 2",
+            "what are the deathly hallows",
+            "hogwarts house quiz",
+            "why was harry a horcrux",
+            "hogwarts houses traits",
+            "harry potter books in order",
+            "how did snape die"
+          ]
+        },
+        {
+          "name": "Isekai manga",
+          "kind": "manga",
+          "about": "isekai manga and light novels such as Mushoku Tensei and Re:Zero",
+          "topics": [
+            {
+              "items": [
+                "mushoku tensei",
+                "re zero",
+                "reincarnated as a slime",
+                "overlord",
+                "shield hero",
+                "konosuba",
+                "the eminence in shadow",
+                "ascendance of a bookworm",
+                "sword art online"
+              ],
+              "templates": [
+                "{} light novel vs anime",
+                "{} reading order",
+                "{} next season release date",
+                "is {} worth reading",
+                "{} power system explained"
+              ]
+            }
+          ],
+          "queries": [
+            "best isekai manga",
+            "what does isekai mean",
+            "isekai with op main character",
+            "isekai manga where mc is a villain",
+            "re zero season 4",
+            "mushoku tensei light novel ending",
+            "isekai anime fall 2026",
+            "isekai manga with good world building"
+          ]
+        },
+        {
+          "name": "DIY & home improvement",
+          "kind": "general",
+          "about": "everyday questions about DIY and home repairs",
+          "topics": [
+            {
+              "items": [
+                "drywall hole",
+                "leaky faucet",
+                "running toilet",
+                "squeaky door",
+                "clogged drain",
+                "garbage disposal",
+                "tripped breaker"
+              ],
+              "templates": [
+                "how to fix a {}",
+                "{} repair cost",
+                "{} diy fix"
+              ]
+            },
+            {
+              "items": [
+                "floating shelves",
+                "a ceiling fan",
+                "laminate flooring",
+                "peel and stick backsplash",
+                "a smart thermostat",
+                "a light switch"
+              ],
+              "templates": [
+                "how to install {}",
+                "{} installation cost",
+                "tools needed to install {}"
+              ]
+            }
+          ],
+          "queries": [
+            "best cordless drill 2026",
+            "how to find a stud without a stud finder",
+            "what paint finish for kitchen",
+            "how to caulk a bathtub",
+            "how to remove wallpaper",
+            "how to unclog a drain without chemicals",
+            "how often to change hvac filter",
+            "how to lower electric bill",
+            "what size nails for baseboards",
+            "how to hang a heavy mirror"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "competitive",
+      "name": "Competitive & superheroes",
+      "interests": [
+        {
+          "name": "League of Legends",
+          "kind": "game",
+          "about": "the video game League of Legends",
+          "topics": [
+            {
+              "items": [
+                "yasuo",
+                "ahri",
+                "jinx",
+                "lee sin",
+                "thresh",
+                "lux",
+                "zed",
+                "ezreal",
+                "darius",
+                "kai'sa",
+                "viego",
+                "ambessa",
+                "mel"
+              ],
+              "templates": [
+                "{} build",
+                "{} counter",
+                "{} runes",
+                "how to play {}",
+                "best {} skin"
+              ]
+            }
+          ],
+          "queries": [
+            "league of legends tier list",
+            "lol patch notes",
+            "how to climb out of silver",
+            "worlds 2026 winner",
+            "faker t1 stats",
+            "lol ranked reset date",
+            "arcane season 2 ending explained",
+            "best adc for beginners",
+            "how to ward properly league",
+            "lol best champions for new players"
+          ]
+        },
+        {
+          "name": "Marvel Cinematic Universe",
+          "kind": "movies",
+          "about": "the Marvel Cinematic Universe films",
+          "topics": [
+            {
+              "items": [
+                "iron man",
+                "captain america",
+                "thor",
+                "black widow",
+                "doctor strange",
+                "spider-man",
+                "wanda",
+                "loki",
+                "thanos",
+                "black panther",
+                "deadpool",
+                "the fantastic four"
+              ],
+              "templates": [
+                "{} mcu timeline",
+                "{} best mcu movie",
+                "{} powers explained",
+                "how strong is {}"
+              ]
+            },
+            {
+              "items": [
+                "avengers endgame",
+                "avengers infinity war",
+                "guardians of the galaxy",
+                "spider-man no way home",
+                "thunderbolts",
+                "avengers doomsday",
+                "spider-man brand new day",
+                "deadpool and wolverine"
+              ],
+              "templates": [
+                "{} post credit scene",
+                "{} box office",
+                "{} cast",
+                "{} ending explained"
+              ]
+            }
+          ],
+          "queries": [
+            "mcu watch order 2026",
+            "avengers doomsday release date",
+            "what is the multiverse saga",
+            "mcu phase 6 movies",
+            "robert downey jr doctor doom",
+            "x-men in the mcu",
+            "how many infinity stones are there",
+            "best mcu movies ranked",
+            "marvel disney plus shows order",
+            "avengers secret wars release date"
+          ]
+        },
+        {
+          "name": "Shonen battle manga",
+          "kind": "manga",
+          "about": "shonen battle manga such as One Piece and Jujutsu Kaisen",
+          "topics": [
+            {
+              "items": [
+                "one piece",
+                "naruto",
+                "jujutsu kaisen",
+                "my hero academia",
+                "bleach",
+                "demon slayer",
+                "hunter x hunter",
+                "dragon ball",
+                "black clover",
+                "kagurabachi"
+              ],
+              "templates": [
+                "{} latest chapter",
+                "{} strongest character",
+                "{} power system explained",
+                "{} filler list",
+                "{} manga ending"
+              ]
+            }
+          ],
+          "queries": [
+            "one piece chapter release date",
+            "best shonen manga ranked",
+            "gear 5 luffy explained",
+            "jujutsu kaisen ending explained",
+            "hunter x hunter hiatus",
+            "dragon ball super manga new chapter",
+            "demon slayer infinity castle movie",
+            "one piece live action season 2"
+          ]
+        },
+        {
+          "name": "Fitness & workouts",
+          "kind": "general",
+          "about": "everyday questions about fitness and working out",
+          "topics": [
+            {
+              "items": [
+                "bench press",
+                "deadlift",
+                "squat",
+                "pull ups",
+                "push ups",
+                "overhead press",
+                "hip thrust"
+              ],
+              "templates": [
+                "how to do {} correctly",
+                "{} muscles worked",
+                "how to increase {}"
+              ]
+            },
+            {
+              "items": [
+                "protein",
+                "creatine",
+                "pre workout",
+                "electrolytes"
+              ],
+              "templates": [
+                "how much {} per day",
+                "best time to take {}",
+                "is {} safe"
+              ]
+            }
+          ],
+          "queries": [
+            "push pull legs routine",
+            "how long to build muscle",
+            "best workout split for beginners",
+            "how many sets per muscle group per week",
+            "is cardio bad for gains",
+            "how to lose belly fat",
+            "lower back pain after deadlifts",
+            "how many rest days per week",
+            "calories burned running 5k",
+            "couch to 5k plan"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "horror",
+      "name": "Horror",
+      "interests": [
+        {
+          "name": "Resident Evil",
+          "kind": "game",
+          "about": "the Resident Evil video game series",
+          "topics": [
+            {
+              "items": [
+                "resident evil 4 remake",
+                "resident evil village",
+                "resident evil 2 remake",
+                "resident evil 7",
+                "resident evil requiem",
+                "resident evil 3 remake"
+              ],
+              "templates": [
+                "{} walkthrough",
+                "{} best weapons",
+                "{} how long to beat",
+                "{} all treasures"
+              ]
+            },
+            {
+              "items": [
+                "leon kennedy",
+                "jill valentine",
+                "chris redfield",
+                "ada wong",
+                "albert wesker",
+                "lady dimitrescu",
+                "nemesis",
+                "mr x",
+                "grace ashcroft"
+              ],
+              "templates": [
+                "{} resident evil lore",
+                "{} voice actor",
+                "{} first appearance resident evil"
+              ]
+            }
+          ],
+          "queries": [
+            "resident evil timeline explained",
+            "resident evil games in order",
+            "resident evil requiem leon",
+            "resident evil 4 remake professional tips",
+            "resident evil movie 2026",
+            "resident evil code veronica remake",
+            "best resident evil game",
+            "resident evil 4 separate ways",
+            "resident evil village shadows of rose",
+            "umbrella corporation explained"
+          ]
+        },
+        {
+          "name": "The Conjuring universe",
+          "kind": "movies",
+          "about": "The Conjuring horror film universe",
+          "topics": [
+            {
+              "items": [
+                "the conjuring",
+                "the conjuring 2",
+                "the devil made me do it",
+                "the conjuring last rites",
+                "annabelle",
+                "annabelle comes home",
+                "the nun",
+                "the nun 2",
+                "the curse of la llorona"
+              ],
+              "templates": [
+                "{} true story",
+                "{} ending explained",
+                "{} box office",
+                "is {} scary"
+              ]
+            }
+          ],
+          "queries": [
+            "conjuring universe watch order",
+            "ed and lorraine warren real cases",
+            "where is the real annabelle doll",
+            "warren occult museum",
+            "enfield haunting true story",
+            "conjuring tv series",
+            "valak explained",
+            "best horror movies 2026",
+            "james wan movies",
+            "the conjuring house rhode island tours"
+          ]
+        },
+        {
+          "name": "Horror manga",
+          "kind": "manga",
+          "about": "horror manga such as Junji Ito's work, Tokyo Ghoul and Parasyte",
+          "topics": [
+            {
+              "items": [
+                "uzumaki",
+                "tomie",
+                "tokyo ghoul",
+                "parasyte",
+                "chainsaw man",
+                "the summer hikaru died",
+                "gyo",
+                "i am a hero",
+                "dandadan"
+              ],
+              "templates": [
+                "{} manga vs anime",
+                "{} manga ending explained",
+                "is {} worth reading",
+                "where to read {} manga",
+                "manga like {}",
+                "is {} manga scary"
+              ]
+            }
+          ],
+          "queries": [
+            "junji ito best stories",
+            "junji ito the enigma of amigara fault",
+            "junji ito maniac anime",
+            "chainsaw man part 2 explained",
+            "chainsaw man reze arc movie",
+            "best horror manga for beginners",
+            "tokyo ghoul re ending explained",
+            "dandadan season 3"
+          ]
+        },
+        {
+          "name": "Health & sleep",
+          "kind": "general",
+          "about": "everyday questions about health and sleep",
+          "topics": [
+            {
+              "items": [
+                "insomnia",
+                "sleep apnea",
+                "restless legs",
+                "night sweats",
+                "sleep paralysis"
+              ],
+              "templates": [
+                "what causes {}",
+                "how to stop {}",
+                "{} symptoms"
+              ]
+            },
+            {
+              "items": [
+                "melatonin",
+                "magnesium",
+                "chamomile tea",
+                "caffeine"
+              ],
+              "templates": [
+                "does {} help you sleep",
+                "how long does {} last",
+                "{} side effects"
+              ]
+            }
+          ],
+          "queries": [
+            "how many hours of sleep do i need",
+            "why do i wake up at 3am",
+            "best sleeping position for back pain",
+            "is napping good for you",
+            "how to fall asleep fast",
+            "do blue light glasses work",
+            "what is rem sleep",
+            "how to fix sleep schedule",
+            "why do we dream",
+            "ideal bedroom temperature for sleep"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "adventure",
+      "name": "Adventure & travel",
+      "interests": [
+        {
+          "name": "Zelda: Tears of the Kingdom",
+          "kind": "game",
+          "about": "the video game The Legend of Zelda: Tears of the Kingdom",
+          "topics": [
+            {
+              "items": [
+                "ganondorf",
+                "phantom ganon",
+                "gleeok",
+                "lynel",
+                "colgera",
+                "queen gibdo",
+                "marbled gohma",
+                "master kohga",
+                "seized construct"
+              ],
+              "templates": [
+                "how to beat {} tears of the kingdom",
+                "{} weakness totk",
+                "{} location totk"
+              ]
+            },
+            {
+              "items": [
+                "master sword",
+                "ultrahand",
+                "autobuild",
+                "hylian shield",
+                "paraglider",
+                "zonai devices",
+                "champion's leathers"
+              ],
+              "templates": [
+                "how to get {} totk",
+                "{} tips tears of the kingdom",
+                "{} location totk"
+              ]
+            }
+          ],
+          "queries": [
+            "tears of the kingdom best armor",
+            "totk how to get more stamina",
+            "totk depths map",
+            "totk all shrine locations",
+            "totk vs breath of the wild",
+            "tears of the kingdom switch 2 edition",
+            "totk best weapon fuse",
+            "totk korok seeds rewards",
+            "legend of zelda movie release date",
+            "zelda timeline explained"
+          ]
+        },
+        {
+          "name": "Indiana Jones",
+          "kind": "movies",
+          "about": "the Indiana Jones film series",
+          "topics": [
+            {
+              "items": [
+                "raiders of the lost ark",
+                "the temple of doom",
+                "the last crusade",
+                "crystal skull",
+                "the dial of destiny"
+              ],
+              "templates": [
+                "indiana jones {} cast",
+                "indiana jones {} filming locations",
+                "indiana jones {} ending explained",
+                "indiana jones {} runtime"
+              ]
+            },
+            {
+              "items": [
+                "marion ravenwood",
+                "short round",
+                "henry jones sr",
+                "belloq",
+                "mutt williams",
+                "sallah"
+              ],
+              "templates": [
+                "{} actor indiana jones",
+                "what happened to {} indiana jones"
+              ]
+            }
+          ],
+          "queries": [
+            "indiana jones movies in order",
+            "is indiana jones based on a real person",
+            "indiana jones and the great circle review",
+            "indiana jones theme john williams",
+            "harrison ford age in dial of destiny",
+            "was the ark of the covenant real",
+            "indiana jones ride disneyland",
+            "best indiana jones movie ranked",
+            "indiana jones whip type",
+            "indiana jones hat style"
+          ]
+        },
+        {
+          "name": "Adventure fantasy manga",
+          "kind": "manga",
+          "about": "adventure fantasy manga such as Frieren and Made in Abyss",
+          "topics": [
+            {
+              "items": [
+                "frieren",
+                "made in abyss",
+                "delicious in dungeon",
+                "magi",
+                "fullmetal alchemist",
+                "the ancient magus' bride",
+                "witch hat atelier",
+                "dragon quest dai",
+                "ranking of kings"
+              ],
+              "templates": [
+                "{} manga vs anime",
+                "{} reading order",
+                "{} next season release",
+                "is {} manga finished",
+                "manga like {}"
+              ]
+            }
+          ],
+          "queries": [
+            "frieren himmel explained",
+            "best adventure manga",
+            "made in abyss movie",
+            "delicious in dungeon recipes in real life",
+            "witch hat atelier anime release date",
+            "fullmetal alchemist brotherhood vs 2003",
+            "frieren new chapter",
+            "made in abyss layers explained"
+          ]
+        },
+        {
+          "name": "Travel & geography",
+          "kind": "general",
+          "about": "everyday questions about travel and geography",
+          "topics": [
+            {
+              "items": [
+                "japan",
+                "iceland",
+                "portugal",
+                "italy",
+                "peru",
+                "new zealand",
+                "norway",
+                "morocco",
+                "vietnam",
+                "canada"
+              ],
+              "templates": [
+                "best time to visit {}",
+                "{} travel itinerary 7 days",
+                "is {} expensive to visit",
+                "{} visa requirements"
+              ]
+            }
+          ],
+          "queries": [
+            "cheapest days to fly",
+            "how early to get to the airport international",
+            "carry on size limits",
+            "best travel credit card",
+            "how to avoid jet lag",
+            "largest country in the world",
+            "how many countries are there",
+            "is travel insurance worth it",
+            "best packing cubes",
+            "how to get a passport fast"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strategist",
+      "name": "Strategy & money",
+      "interests": [
+        {
+          "name": "Civilization",
+          "kind": "game",
+          "about": "the Civilization strategy video games (Civ VI and Civ VII)",
+          "topics": [
+            {
+              "items": [
+                "gandhi",
+                "genghis khan",
+                "cleopatra",
+                "montezuma",
+                "gilgamesh",
+                "trajan",
+                "pericles",
+                "peter the great",
+                "saladin",
+                "tomyris"
+              ],
+              "templates": [
+                "{} civ 6 strategy",
+                "{} civ 6 best victory type",
+                "is {} good civ 6"
+              ]
+            },
+            {
+              "items": [
+                "rome",
+                "egypt",
+                "han",
+                "maya",
+                "mongolia",
+                "greece",
+                "persia",
+                "inca",
+                "meiji japan",
+                "prussia"
+              ],
+              "templates": [
+                "{} civ 7 strategy",
+                "best leader for {} civ 7",
+                "{} unique units civ 7"
+              ]
+            }
+          ],
+          "queries": [
+            "civ 6 best civ for beginners",
+            "civ 6 science victory guide",
+            "civ 7 age transitions explained",
+            "civ 7 vs civ 6 which is better",
+            "civ 6 district adjacency guide",
+            "civ 7 best leaders tier list",
+            "how to win culture victory civ 6",
+            "civ 6 multiplayer settings",
+            "civ 7 crises explained",
+            "civilization games ranked"
+          ]
+        },
+        {
+          "name": "Dune films",
+          "kind": "movies",
+          "about": "Denis Villeneuve's Dune film series",
+          "topics": [
+            {
+              "items": [
+                "paul atreides",
+                "lady jessica",
+                "chani",
+                "duncan idaho",
+                "baron harkonnen",
+                "feyd-rautha",
+                "stilgar",
+                "gurney halleck",
+                "thufir hawat",
+                "princess irulan",
+                "alia atreides"
+              ],
+              "templates": [
+                "{} actor dune",
+                "{} dune explained",
+                "what happens to {} in dune messiah"
+              ]
+            }
+          ],
+          "queries": [
+            "dune part three release date",
+            "dune messiah movie cast",
+            "dune books in order",
+            "what is the spice in dune",
+            "bene gesserit explained",
+            "dune 1984 vs villeneuve",
+            "dune prophecy season 2",
+            "how big are sandworms",
+            "what is the kwisatz haderach",
+            "dune filming locations jordan"
+          ]
+        },
+        {
+          "name": "Strategy & mind-game manga",
+          "kind": "manga",
+          "about": "strategy and mind-game manga such as Kingdom and Liar Game",
+          "topics": [
+            {
+              "items": [
+                "kingdom",
+                "legend of the galactic heroes",
+                "the apothecary diaries",
+                "spice and wolf",
+                "the heroic legend of arslan",
+                "tomodachi game",
+                "kakegurui",
+                "liar game"
+              ],
+              "templates": [
+                "{} manga vs anime",
+                "{} reading order",
+                "is {} worth reading",
+                "{} best arc",
+                "manga like {}"
+              ]
+            }
+          ],
+          "queries": [
+            "kingdom manga ending",
+            "kingdom manga real history",
+            "best strategy manga",
+            "liar game minority rule explained",
+            "apothecary diaries season 3",
+            "legend of galactic heroes reinhard vs yang",
+            "spice and wolf economics explained",
+            "kingdom manga how many chapters"
+          ]
+        },
+        {
+          "name": "Economics & personal finance",
+          "kind": "general",
+          "about": "everyday questions about economics and personal finance",
+          "topics": [
+            {
+              "items": [
+                "index fund",
+                "roth ira",
+                "401k",
+                "health savings account",
+                "high yield savings account",
+                "bond",
+                "etf",
+                "treasury bill"
+              ],
+              "templates": [
+                "what is a {}",
+                "how does a {} work",
+                "{} pros and cons"
+              ]
+            }
+          ],
+          "queries": [
+            "what causes inflation",
+            "how do interest rates affect stocks",
+            "compound interest calculator",
+            "how to start investing with little money",
+            "what is a recession",
+            "how does the stock market work",
+            "current fed interest rate",
+            "how to build credit score fast",
+            "50 30 20 budget rule",
+            "is gold a good investment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motorsport",
+      "name": "Cars & sports",
+      "interests": [
+        {
+          "name": "Forza Horizon 5",
+          "kind": "game",
+          "about": "the racing video game Forza Horizon 5",
+          "topics": [
+            {
+              "items": [
+                "koenigsegg jesko",
+                "bugatti chiron",
+                "porsche 911 gt3",
+                "toyota supra",
+                "nissan skyline r34",
+                "ford bronco",
+                "lamborghini sian",
+                "mclaren f1",
+                "subaru wrx sti",
+                "mazda rx-7"
+              ],
+              "templates": [
+                "{} tune forza horizon 5",
+                "how to get {} forza horizon 5",
+                "{} top speed forza horizon 5"
+              ]
+            }
+          ],
+          "queries": [
+            "forza horizon 5 best drag car",
+            "fh5 money glitch",
+            "forza horizon 5 festival playlist this week",
+            "forza horizon 6 release date",
+            "fh5 best drift setup",
+            "forza horizon 5 wheelspin farming",
+            "forza horizon 5 ps5 crossplay",
+            "fh5 barn find locations",
+            "fh5 hot wheels dlc worth it",
+            "best starter car forza horizon 5"
+          ]
+        },
+        {
+          "name": "Fast & Furious",
+          "kind": "movies",
+          "about": "the Fast & Furious film series",
+          "topics": [
+            {
+              "items": [
+                "the fast and the furious",
+                "2 fast 2 furious",
+                "tokyo drift",
+                "fast five",
+                "fast and furious 6",
+                "furious 7",
+                "the fate of the furious",
+                "f9",
+                "fast x"
+              ],
+              "templates": [
+                "{} cars list",
+                "{} cast",
+                "{} filming locations",
+                "{} box office"
+              ]
+            }
+          ],
+          "queries": [
+            "fast and furious watch order",
+            "fast x part 2 release date",
+            "paul walker last movie",
+            "han death timeline explained",
+            "dom toretto charger specs",
+            "hobbs and shaw 2",
+            "brian's supra fast and furious",
+            "how many fast and furious movies are there",
+            "fast and furious timeline explained",
+            "tokyo drift when does it take place"
+          ]
+        },
+        {
+          "name": "Sports manga",
+          "kind": "manga",
+          "about": "sports manga such as Haikyuu, Slam Dunk and Blue Lock",
+          "topics": [
+            {
+              "items": [
+                "haikyuu",
+                "slam dunk",
+                "blue lock",
+                "hajime no ippo",
+                "kuroko's basketball",
+                "ace of diamond",
+                "yowamushi pedal",
+                "eyeshield 21",
+                "ao ashi"
+              ],
+              "templates": [
+                "{} manga vs anime",
+                "{} manga ending",
+                "{} best match",
+                "is {} finished",
+                "{} where to start manga"
+              ]
+            }
+          ],
+          "queries": [
+            "best sports manga",
+            "haikyuu final movie",
+            "blue lock season 3",
+            "the first slam dunk movie",
+            "hajime no ippo latest chapter",
+            "haikyuu timeskip explained",
+            "blue lock rankings",
+            "the first slam dunk streaming"
+          ]
+        },
+        {
+          "name": "Car care",
+          "kind": "general",
+          "about": "everyday questions about car care and maintenance",
+          "topics": [
+            {
+              "items": [
+                "brake pads",
+                "car battery",
+                "spark plugs",
+                "wiper blades",
+                "engine air filter",
+                "tires",
+                "serpentine belt"
+              ],
+              "templates": [
+                "how often to replace {}",
+                "{} replacement cost",
+                "signs you need new {}",
+                "how to replace {} yourself"
+              ]
+            }
+          ],
+          "queries": [
+            "how often should you change your oil",
+            "what does check engine light mean",
+            "how to jump start a car",
+            "what tire pressure should i use",
+            "hybrid vs electric car",
+            "how to check transmission fluid",
+            "why is my car shaking when braking",
+            "how to clean foggy headlights",
+            "best cars of 2026",
+            "ev charging cost at home"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cozy",
+      "name": "Cozy & cooking",
+      "interests": [
+        {
+          "name": "Stardew Valley",
+          "kind": "game",
+          "about": "the farming video game Stardew Valley",
+          "topics": [
+            {
+              "items": [
+                "abigail",
+                "sebastian",
+                "haley",
+                "shane",
+                "penny",
+                "leah",
+                "harvey",
+                "elliott",
+                "emily",
+                "alex",
+                "krobus",
+                "maru",
+                "sam"
+              ],
+              "templates": [
+                "{} birthday stardew valley",
+                "what does {} like stardew",
+                "{} heart events stardew",
+                "{} schedule stardew"
+              ]
+            },
+            {
+              "items": [
+                "ancient fruit",
+                "starfruit",
+                "prismatic shard",
+                "iridium",
+                "truffles",
+                "golden walnuts",
+                "rarecrows"
+              ],
+              "templates": [
+                "how to get {} stardew",
+                "{} stardew uses",
+                "best way to farm {} stardew"
+              ]
+            }
+          ],
+          "queries": [
+            "stardew valley 1.6 new content",
+            "stardew valley best crops each season",
+            "stardew valley community center bundles",
+            "stardew valley how to get to skull cavern",
+            "stardew valley best farm layout",
+            "haunted chocolatier release date",
+            "stardew valley ginger island guide",
+            "stardew valley fishing tips",
+            "stardew valley how to make money fast",
+            "stardew valley qi gems"
+          ]
+        },
+        {
+          "name": "Studio Ghibli films",
+          "kind": "movies",
+          "about": "the Studio Ghibli animated films",
+          "topics": [
+            {
+              "items": [
+                "spirited away",
+                "my neighbor totoro",
+                "princess mononoke",
+                "howl's moving castle",
+                "kiki's delivery service",
+                "castle in the sky",
+                "ponyo",
+                "the boy and the heron",
+                "nausicaa",
+                "whisper of the heart",
+                "the wind rises"
+              ],
+              "templates": [
+                "{} meaning",
+                "{} ending explained",
+                "{} english dub cast",
+                "where to watch {}"
+              ]
+            }
+          ],
+          "queries": [
+            "studio ghibli movies ranked",
+            "ghibli museum tickets",
+            "ghibli park japan",
+            "hayao miyazaki next movie",
+            "joe hisaishi best songs",
+            "ghibli food recipes",
+            "studio ghibli movies in order",
+            "who is no face in spirited away",
+            "what is totoro",
+            "how to draw in ghibli style"
+          ]
+        },
+        {
+          "name": "Slice-of-life & romance manga",
+          "kind": "manga",
+          "about": "slice-of-life and romance manga such as Horimiya and Yotsuba&!",
+          "topics": [
+            {
+              "items": [
+                "horimiya",
+                "kaguya-sama love is war",
+                "yotsuba&!",
+                "komi can't communicate",
+                "my dress-up darling",
+                "skip and loafer",
+                "a sign of affection",
+                "the dangers in my heart",
+                "fruits basket",
+                "wotakoi"
+              ],
+              "templates": [
+                "{} manga ending",
+                "{} new season",
+                "{} manga vs anime",
+                "is {} worth reading",
+                "manga like {}"
+              ]
+            }
+          ],
+          "queries": [
+            "best romance manga",
+            "wholesome manga recommendations",
+            "yotsuba new volume",
+            "kaguya sama movie",
+            "fruits basket 2019 vs 2001",
+            "best slice of life anime",
+            "skip and loafer season 2",
+            "my dress-up darling season 2"
+          ]
+        },
+        {
+          "name": "Cooking & recipes",
+          "kind": "general",
+          "about": "everyday questions about cooking and recipes",
+          "topics": [
+            {
+              "items": [
+                "chicken thighs",
+                "salmon",
+                "broccoli",
+                "potatoes",
+                "pork chops",
+                "tofu",
+                "brussels sprouts",
+                "shrimp"
+              ],
+              "templates": [
+                "easy {} recipe",
+                "{} air fryer time",
+                "how to season {}",
+                "how long to bake {}"
+              ]
+            }
+          ],
+          "queries": [
+            "how to make sourdough starter",
+            "what can i make with eggs and rice",
+            "meal prep ideas for the week",
+            "how to sharpen a kitchen knife",
+            "substitute for buttermilk",
+            "how to cook rice perfectly",
+            "how to season cast iron",
+            "easy dinner ideas tonight",
+            "how long to boil eggs",
+            "gluten free bread recipe"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mystery",
+      "name": "Mystery & tech",
+      "interests": [
+        {
+          "name": "Grand Theft Auto",
+          "kind": "game",
+          "about": "the video games GTA V, GTA Online and the upcoming GTA VI",
+          "topics": [
+            {
+              "items": [
+                "fleeca job",
+                "prison break heist",
+                "humane labs raid",
+                "pacific standard job",
+                "cayo perico heist",
+                "diamond casino heist",
+                "doomsday heist"
+              ],
+              "templates": [
+                "{} gta online guide",
+                "{} best approach",
+                "{} payout gta online"
+              ]
+            },
+            {
+              "items": [
+                "oppressor mk2",
+                "deluxo",
+                "armored kuruma",
+                "zentorno",
+                "vigilante",
+                "toreador"
+              ],
+              "templates": [
+                "{} gta online price",
+                "how to get {} gta online",
+                "is {} worth it gta online"
+              ]
+            }
+          ],
+          "queries": [
+            "gta 5 cheats ps5",
+            "gta 5 story mode best missions",
+            "gta 6 map size",
+            "gta 6 trailer",
+            "gta 6 characters jason and lucia",
+            "gta online weekly update",
+            "gta 5 how to make money story mode",
+            "gta 5 stock market assassination missions",
+            "gta online best business",
+            "gta 5 enhanced pc"
+          ]
+        },
+        {
+          "name": "James Bond",
+          "kind": "movies",
+          "about": "the James Bond 007 film series",
+          "topics": [
+            {
+              "items": [
+                "dr no",
+                "goldfinger",
+                "from russia with love",
+                "the spy who loved me",
+                "goldeneye",
+                "casino royale",
+                "skyfall",
+                "no time to die",
+                "spectre",
+                "licence to kill"
+              ],
+              "templates": [
+                "{} bond girl",
+                "{} theme song",
+                "{} filming locations",
+                "{} villain"
+              ]
+            }
+          ],
+          "queries": [
+            "james bond movies in order",
+            "who is the next james bond",
+            "bond 26 director",
+            "best james bond actor",
+            "daniel craig last bond movie",
+            "vesper martini recipe",
+            "aston martin db5 james bond",
+            "how many james bond movies are there",
+            "007 first light game",
+            "sean connery best bond film"
+          ]
+        },
+        {
+          "name": "Mystery & detective manga",
+          "kind": "manga",
+          "about": "mystery and detective manga such as Detective Conan and Monster",
+          "topics": [
+            {
+              "items": [
+                "detective conan",
+                "death note",
+                "monster",
+                "the promised neverland",
+                "moriarty the patriot",
+                "bungo stray dogs",
+                "summer time rendering",
+                "erased",
+                "pluto"
+              ],
+              "templates": [
+                "{} ending explained",
+                "{} manga vs anime",
+                "is {} worth reading",
+                "{} best arc",
+                "manga like {}"
+              ]
+            }
+          ],
+          "queries": [
+            "detective conan black organization explained",
+            "death note l vs light who wins",
+            "best mystery manga",
+            "monster johan liebert explained",
+            "detective conan how many episodes",
+            "death note rules list",
+            "erased manga vs anime ending",
+            "naoki urasawa best manga"
+          ]
+        },
+        {
+          "name": "Tech help",
+          "kind": "general",
+          "about": "everyday questions about computers, phones and tech problems",
+          "topics": [
+            {
+              "items": [
+                "laptop",
+                "phone",
+                "wifi",
+                "pc",
+                "browser"
+              ],
+              "templates": [
+                "why is my {} so slow",
+                "how to speed up my {}"
+              ]
+            },
+            {
+              "items": [
+                "printer",
+                "bluetooth headphones",
+                "airpods",
+                "wireless keyboard",
+                "webcam"
+              ],
+              "templates": [
+                "{} not working fix",
+                "how to reset {}",
+                "{} not connecting"
+              ]
+            }
+          ],
+          "queries": [
+            "how to take a screenshot on windows",
+            "best password manager",
+            "how to free up storage on iphone",
+            "windows 11 vs windows 10",
+            "how to back up my phone",
+            "is a vpn worth it",
+            "how to tell if a website is safe",
+            "best budget laptop 2026",
+            "how to recover deleted files",
+            "how to clear browser cache"
+          ]
+        }
+      ]
+    }
+  ]
+}

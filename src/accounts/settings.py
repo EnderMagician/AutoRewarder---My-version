@@ -3,6 +3,11 @@
 import json
 import os
 
+from ..batch_pacing import (
+    default_batch_pacing,
+    normalize_batch_pacing,
+    validate_batch_pacing,
+)
 from ..config import APP_DIR, GLOBAL_SETTINGS_PATH
 
 SCHEMA_VERSION = 3
@@ -136,6 +141,10 @@ class GlobalSettingsManager:
             # Whether the GUI's multi-account batch includes Daily Set /
             # claim / earn tasks. This only affects "Run all accounts".
             "batch_include_daily_tasks": False,
+            # How "Run all accounts" spaces accounts out: order, pauses
+            # between accounts and phases, and day-to-day count variance.
+            # See src/batch_pacing.py.
+            "batch_pacing": default_batch_pacing(),
             # LLM-generated search terms (bring-your-own-key). When enabled and
             # a key is present, each phase asks the chosen provider for fresh
             # queries in the user's language; any failure falls back to the
@@ -348,6 +357,33 @@ class GlobalSettingsManager:
         settings["manual_search_delay_max"] = maximum
         self.save_settings(settings)
 
+        return True
+
+    def get_batch_pacing(self):
+        """Return the multi-account batch pacing, with defaults for bad values."""
+        return normalize_batch_pacing(self.get_settings().get("batch_pacing"))
+
+    def set_batch_pacing(self, pacing):
+        """
+        Persist the multi-account batch pacing.
+
+        Args:
+            pacing (dict): values for any keys of DEFAULT_BATCH_PACING; keys
+                left out keep their saved value.
+
+        Returns:
+            bool: True when every value was valid and the settings were saved.
+        """
+        if not isinstance(pacing, dict):
+            return False
+        merged = {**self.get_batch_pacing(), **pacing}
+        validated = validate_batch_pacing(merged)
+        if validated is None:
+            return False
+
+        settings = self.settings_for_update()
+        settings["batch_pacing"] = validated
+        self.save_settings(settings)
         return True
 
     def get_star_prompt_state(self):

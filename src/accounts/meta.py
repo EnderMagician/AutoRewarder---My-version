@@ -191,6 +191,28 @@ class AccountMetaManager:
             return variant
         return DEFAULT_DASHBOARD_VARIANT
 
+    def get_search_profile(self):
+        """
+        Return this account's search profile id.
+
+        "auto" (the default, and what older meta.json files resolve to) means
+        no profile has been picked yet; "random" means the plain random query
+        list. Anything else is an id from assets/search_profiles.json.
+        """
+        value = self.get_meta().get("search_profile")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return "auto"
+
+    def set_search_profile(self, profile_id):
+        """Persist this account's search profile id (validated by the caller)."""
+        if not isinstance(profile_id, str) or not profile_id.strip():
+            return False
+        meta = self.get_meta()
+        meta["search_profile"] = profile_id.strip()
+        self.save_meta(meta)
+        return True
+
     def set_dashboard_variant(self, variant):
         """
         Persist this account's Rewards dashboard variant.
