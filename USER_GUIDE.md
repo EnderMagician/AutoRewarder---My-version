@@ -506,6 +506,6 @@ A: AutoRewarder officially supports Windows (installer and portable) and Linux (
 
 **Last Updated**: November 2026
 
-**Version**: 4.4.1
+**Version**: 4.4.2
 
 Enjoy using AutoRewarder! 🎉
